@@ -8,30 +8,25 @@ A cafe menu webpage (hosted on GitHub Pages) that always shows the **latest menu
 ## Prerequisites
 
 ### 1. Google account & Drive setup
-- [ ] One Gmail account (already have this)
-- [ ] Google Sheet created with cafe menu data (NOT a raw `.xlsx` upload — convert/create as a native Google Sheet)
-- [ ] Sheet columns finalized, e.g.:
-  | Category | Item Name | Description | Price | Available (Yes/No) |
-- [ ] Sheet sharing set to: **File → Share → General access → Anyone with the link → Viewer**
-- [ ] Sheet published as CSV:
-  - `File → Share → Publish to web`
-  - Select the specific sheet/tab
-  - Format: **Comma-separated values (.csv)**
-  - Click Publish → copy the generated CSV URL
+- [x] Google Sheet created from the uploaded `menu.csv`
+- [x] Menu columns are `Category`, `Item Name`, `Description`, `Price`, `Available`, and `Tags`
+- [x] Sheet published to the web as CSV; the published feed is publicly readable
+- [ ] Confirm the published CSV feed remains enabled after future sheet changes
 
 ### 2. GitHub setup
-- [ ] GitHub repo already created and connected to GitHub Pages (already deployed — confirmed)
-- [ ] Repo has `index.html`, `style.css`, `script.js` (or equivalent structure)
-- [ ] Ability to push commits and see GitHub Pages redeploy automatically
+- [x] Create public repository [`daily-grind-menu`](https://github.com/Ali-Akbar-Kolkar/daily-grind-menu)
+- [ ] Connect the local `poc` repository and push the `main` branch
+- [ ] Add repository variable `MENU_CSV_URL` under **Settings → Secrets and variables → Actions → Variables**
+- [ ] Set **Settings → Pages → Build and deployment → Source** to **GitHub Actions**
+- [ ] Push the `main` branch and verify the Pages deployment URL
 
 ### 3. Libraries (no backend/server needed)
-- [ ] [PapaParse](https://www.papaparse.com/) — CSV parsing in-browser (via CDN, no install)
-- [ ] Plain JavaScript `fetch()` — built into all browsers
+- [x] [PapaParse](https://www.papaparse.com/) — CSV parsing in-browser (via CDN, no install)
+- [x] Plain JavaScript `fetch()` — built into all browsers
 
 ### 4. Skills/access needed
-- [ ] Basic HTML/CSS for card layout (already exists on your deployed page)
-- [ ] Enough JS to fetch a URL and loop over rows to build cards
-- [ ] Google Sheet edit access for whoever updates prices (the cafe owner)
+- [x] Static HTML/CSS/JavaScript menu page is implemented
+- [x] Google Sheet edit access is available for menu updates
 
 ---
 
@@ -81,3 +76,22 @@ what's already deployed]
 - If the Sheet is ever "unpublished" or sharing is changed to private, the fetch will start failing silently (page will just fail to update) — this is worth a fallback message.
 - Do **not** use the raw Google Drive `.xlsx` file API route unless you specifically need real Excel formatting/formulas preserved — it needs an API key and more setup for no real benefit here.
 - This approach has **no login, no cost, no server** — ideal for a single cafe use case.
+
+Implementation Progress
+=======================
+
+Completed
+- Uploaded `menu.csv` to Google Drive, opened it in Google Sheets, and published the `menu` tab as CSV.
+- Verified the published feed responds successfully, returns the expected CSV headers, and allows browser cross-origin requests.
+- Updated the menu page to read `window.MENU_CSV_URL`. The local POC config now points to the published Drive feed; the imported local `menu.csv` has since been removed.
+- Added `site-config.js` and a GitHub Actions Pages workflow. During deployment, the workflow generates `site-config.js` from the `MENU_CSV_URL` repository variable.
+- Updated and ran `node smoke-test.js`; all checks pass, including the configured remote-feed retry behavior.
+- Created local commits `f5b5e81` and `a35383e`. The GitHub repository now exists; pushing the current branch is next.
+
+Remaining Steps
+===============
+
+1. Connect the local repository to `daily-grind-menu` and push `main`.
+2. Add `MENU_CSV_URL` as a repository variable with the published CSV URL. This URL is public, so it does not need to be stored as a secret.
+3. Set the repository's Pages source to **GitHub Actions**. The workflow deploys on pushes to `main`.
+4. Open the Pages deployment URL and confirm the menu loads from the Google Sheet.

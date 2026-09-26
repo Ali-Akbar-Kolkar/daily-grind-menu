@@ -4,7 +4,26 @@ const path = require('path');
 
 const POC = __dirname;
 const SCRIPT = fs.readFileSync(path.join(POC, 'script.js'), 'utf8');
-const CSV = fs.readFileSync(path.join(POC, 'menu.csv'), 'utf8');
+const CSV = `Category,Item Name,Description,Price,Available,Tags
+Coffee,Espresso,A double shot of our house blend. Sweet and balanced.,4.5,Yes,
+Coffee,Flat White,Double ristretto with steamed milk and a thin layer of foam.,4.75,Yes,
+Coffee,Cortado,Equal parts espresso and warm milk. Small and serious.,4,Yes,
+Coffee,Filter of the Day,Rotating single origin brewed every twenty minutes.,4.25,Yes,V
+Coffee,Cold Brew,Twelve hours in the fridge. Smooth and low acid.,5,Yes,V
+Coffee,Seasonal Mocha,Maple and sea salt espresso. Ask if it is still on.,5.75,No,
+Tea & Infusions,Masala Chai,House masala steeped with black tea and steamed milk.,4.75,Yes,V
+Tea & Infusions,Sencha,Steamed Japanese green tea. Grassy and clean.,4,Yes,V
+Tea & Infusions,Peppermint,"Loose leaf, naturally caffeine free.",3.5,Yes,caffeine free
+Bakery,Croissant,Butter laminated over three days. Best before ten.,4.25,Yes,V
+Bakery,Pain au Chocolat,"Baked with dark chocolate batons, 70% Valrhona.",4.75,Yes,V
+Bakery,Almond Danish,Almond frangipane with a citrus glaze.,5.25,Yes,V
+Bakery,Olive Oil Focaccia,Sea salt and rosemary. Warm from the tray.,4,Yes,V
+Kitchen,Avocado Toast,"Sourdough, smashed avocado, pickled shallot, chilli oil.",11.5,Yes,V
+Kitchen,Shakshuka,"Two baked eggs in a spiced tomato and pepper stew, with feta.",12,Yes,"V, GF"
+Kitchen,Grilled Cheese,Three cheeses and honey mustard on country loaf.,10.5,Yes,V
+Kitchen,Lentil Bowl,"Roasted squash, Puy lentils and tahini dressing. Add feta for 1.50.",13,Yes,"V, GF"
+Kitchen,Chef's Sandwich,Whatever is left in the fridge. Ask before you order.,45,Yes,
+Kitchen,Chef's Sandwich 1,Whatever is left in the fridge. Ask before you order to order,243,yes,`;
 
 function makeNode(tag) {
   return {

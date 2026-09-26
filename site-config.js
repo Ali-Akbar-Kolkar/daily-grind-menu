@@ -1,1 +1,1 @@
-window.MENU_CSV_URL = '';
+window.MENU_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vToUFJhDlT8H5SQG8CqSxfFzhYQ_KNmx9dL1SAIcOXNZiSI4I7CyD7zgjYOlbPt3ZtWWQEYjlglybPN/pub?gid=810010135&single=true&output=csv';
