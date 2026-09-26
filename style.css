@@ -296,6 +296,15 @@ body {
 
 .footer p { margin: 0; }
 
+.footer__credit {
+  flex: 1 0 100%;
+  text-align: center;
+}
+
+.footer__credit a { color: inherit; }
+
+.footer__credit a:hover { color: var(--caramel); }
+
 /* ---------- small screens ---------- */
 
 @media (max-width: 40rem) {
