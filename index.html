@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Menu &middot; The Daily Grind</title>
+<meta name="description" content="Our current cafe menu, updated straight from the kitchen sheet.">
+<meta name="color-scheme" content="light">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Karla:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="page">
+
+  <header class="masthead">
+    <p class="masthead__eyebrow">Est. 2019 &middot; Open 7am&ndash;4pm</p>
+    <h1 class="masthead__title">The Daily Grind</h1>
+    <p class="masthead__tagline">Small batch, slow poured, baked this morning.</p>
+    <p class="masthead__meta">
+      <span id="itemCount" class="masthead__count"></span>
+      <span id="lastUpdated" class="masthead__updated"></span>
+    </p>
+  </header>
+
+  <main>
+    <div id="status" class="status" role="status" aria-live="polite">
+      <p class="status__text">Warming up the espresso machine&hellip;</p>
+    </div>
+
+    <div id="skeletons" class="menu-grid menu-grid--skeleton" aria-hidden="true">
+      <div class="card card--skeleton"></div>
+      <div class="card card--skeleton"></div>
+      <div class="card card--skeleton"></div>
+      <div class="card card--skeleton"></div>
+      <div class="card card--skeleton"></div>
+      <div class="card card--skeleton"></div>
+    </div>
+
+    <div id="menu" class="menu" aria-busy="true"></div>
+  </main>
+
+  <footer class="footer">
+    <p>Prices include tax. Ask about allergens before ordering.</p>
+    <button type="button" id="refresh" class="btn btn--ghost" hidden>Refresh menu</button>
+  </footer>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5/papaparse.min.js" defer></script>
+<script src="script.js" defer></script>
+</body>
+</html>
