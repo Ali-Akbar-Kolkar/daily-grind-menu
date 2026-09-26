@@ -1,0 +1,18 @@
+Category,Item Name,Description,Price,Available,Tags,Image
+Coffee,Espresso,A double shot of our house blend. Sweet and balanced.,4.5,No,,https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQb1OxoJy8BKWqmm-fMc9BGM2zEjlW45DaZLiHuWYbCKQ&s=10
+Coffee,Flat White,Double ristretto with steamed milk and a thin layer of foam.,4.75,Yes,,https://picsum.photos/seed/flatwhite/640/420
+Coffee,Cortado,Equal parts espresso and warm milk. Small and serious.,4,Yes,,https://picsum.photos/seed/cortado/640/420
+Coffee,Filter of the Day,Rotating single origin brewed every twenty minutes.,4.25,Yes,V,https://picsum.photos/seed/filteroftheday/640/420
+Coffee,Cold Brew,Twelve hours in the fridge. Smooth and low acid.,5,Yes,V,https://picsum.photos/seed/coldbrew/640/420
+Coffee,Seasonal Mocha,Maple and sea salt espresso. Ask if it is still on.,5.75,No,,https://picsum.photos/seed/seasonalmocha/640/420
+Tea & Infusions,Masala Chai,House masala steeped with black tea and steamed milk.,4.75,Yes,V,https://picsum.photos/seed/malasachai/640/420
+Tea & Infusions,Sencha,Steamed Japanese green tea. Grassy and clean.,4,Yes,V,
+Tea & Infusions,Peppermint,"Loose leaf, naturally caffeine free.",3.5,Yes,caffeine free,https://picsum.photos/seed/peppermint/640/420
+Bakery,Croissant,Butter laminated over three days. Best before ten.,4.25,Yes,V,https://picsum.photos/seed/croissant/640/420
+Bakery,Pain au Chocolat,"Baked with dark chocolate batons, 70% Valrhona.",4.75,Yes,V,https://lh3.googleusercontent.com/d/PASTE_A_DRIVE_FILE_ID=w800
+Bakery,Almond Danish,Almond frangipane with a citrus glaze.,5.25,Yes,V,https://drive.google.com/file/d/PASTE_ANOTHER_FILE_ID/view?usp=sharing
+Bakery,Olive Oil Focaccia,Sea salt and rosemary. Warm from the tray.,4,Yes,V,https://example.invalid/not-a-real-image.jpg
+Kitchen,Avocado Toast,"Sourdough, smashed avocado, pickled shallot, chilli oil.",11.5,Yes,V,https://picsum.photos/seed/avocadotoast/640/420
+Kitchen,Shakshuka,"Two baked eggs in a spiced tomato and pepper stew, with feta.",12,Yes,"V, GF",
+Kitchen,Grilled Cheese,Three cheeses and honey mustard on country loaf.,10.5,Yes,V,https://picsum.photos/seed/grilledcheese/640/420
+Kitchen,Lentil Bowl,"Roasted squash, Puy lentils and tahini dressing. Add feta for 1.50.",13,Yes,"V, GF",https://picsum.photos/seed/lentilbowl/640/420

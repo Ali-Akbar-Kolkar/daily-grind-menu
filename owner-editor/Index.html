@@ -1,0 +1,857 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Menu editor &middot; The Daily Grind</title>
+<style>
+:root {
+  --espresso: #33201a;
+  --coffee: #5b4034;
+  --crema: #f3e7d7;
+  --paper: #fdf8f2;
+  --card: #fffdfa;
+  --caramel: #b9712c;
+  --caramel-soft: #e8c79a;
+  --line: #e6d6c3;
+  --muted: #8a7566;
+  --leaf: #4d6b4f;
+  --clay: #a5432f;
+  --radius: 14px;
+  --shadow: 0 1px 2px rgba(51, 32, 26, .06), 0 8px 24px rgba(51, 32, 26, .07);
+  --serif: "Fraunces", Georgia, "Times New Roman", serif;
+  --sans: "Karla", ui-sans-serif, system-ui, "Segoe UI", Helvetica, Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 0 0 5rem;
+  font-family: var(--sans);
+  font-size: 1rem;
+  line-height: 1.5;
+  color: var(--espresso);
+  background: var(--paper);
+  background-image: radial-gradient(50rem 24rem at 50% -10rem, rgba(232, 199, 154, .45), transparent 60%);
+  background-repeat: no-repeat;
+}
+
+.wrap { width: min(100% - 1.5rem, 44rem); margin-inline: auto; }
+
+h1, h2, h3 { font-family: var(--serif); line-height: 1.2; }
+
+.topbar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.5rem 0 1rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.eyebrow {
+  margin: 0 0 .3rem;
+  font-size: .7rem;
+  font-weight: 700;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.topbar h1 { margin: 0; font-size: 1.6rem; }
+
+.meta { margin: .6rem 0 0; font-size: .82rem; color: var(--muted); }
+
+.banner {
+  margin: 1rem 0 0;
+  padding: .85rem 1rem;
+  border: 1px solid rgba(165, 67, 47, .35);
+  border-radius: var(--radius);
+  background: rgba(165, 67, 47, .06);
+  color: var(--clay);
+  font-size: .9rem;
+}
+
+.banner[hidden] { display: none; }
+.banner strong { display: block; margin-bottom: .2rem; }
+.banner ol { margin: .4rem 0 0; padding-left: 1.1rem; }
+
+.spinner { margin: 2rem 0; text-align: center; color: var(--muted); font-size: .9rem; }
+
+.group { margin: 1.75rem 0 0; }
+
+.group__title {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  margin: 0 0 .6rem;
+  font-size: 1.15rem;
+}
+
+.group__title::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, var(--caramel-soft), transparent);
+}
+
+.group__count {
+  font-family: var(--sans);
+  font-size: .7rem;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  padding: .6rem;
+  margin-bottom: .5rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card);
+  box-shadow: var(--shadow);
+}
+
+.row--off { opacity: .62; }
+
+.row__thumb {
+  flex: none;
+  width: 3.25rem;
+  height: 3.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 9px;
+  background: var(--crema);
+  font-size: .6rem;
+  font-weight: 700;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.row__thumb img { width: 100%; height: 100%; object-fit: cover; }
+
+.row__body { flex: 1; min-width: 0; }
+.row__body h3 { margin: 0; font-size: 1rem; }
+.row__desc { margin: .1rem 0 0; font-size: .82rem; color: var(--coffee); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.row__tags { margin: .2rem 0 0; font-size: .7rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--leaf); }
+.row__tags--off { color: var(--clay); }
+
+.row__price { flex: none; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--caramel); }
+
+.row__actions { flex: none; display: flex; gap: .3rem; }
+
+.icon {
+  padding: .35rem .55rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: transparent;
+  font: inherit;
+  font-size: .78rem;
+  font-weight: 700;
+  color: var(--coffee);
+  cursor: pointer;
+}
+
+.icon:hover { border-color: var(--caramel-soft); background: rgba(185, 113, 44, .08); }
+.icon:focus-visible, .btn:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {
+  outline: 2px solid var(--espresso);
+  outline-offset: 2px;
+}
+
+.icon--danger { color: var(--clay); }
+.icon--danger:hover { border-color: rgba(165, 67, 47, .4); background: rgba(165, 67, 47, .08); }
+
+.btn {
+  padding: .55rem 1.1rem;
+  border: 1px solid var(--caramel);
+  border-radius: 999px;
+  background: var(--caramel);
+  font: inherit;
+  font-weight: 700;
+  font-size: .9rem;
+  color: #fff;
+  cursor: pointer;
+}
+
+.btn:hover { background: #a4621f; border-color: #a4621f; }
+.btn[disabled] { opacity: .55; cursor: progress; }
+
+.btn--ghost { border-color: var(--line); background: transparent; color: var(--coffee); }
+.btn--ghost:hover { border-color: var(--caramel-soft); background: rgba(185, 113, 44, .08); color: var(--espresso); }
+
+.btn--wide { width: 100%; }
+
+.listbar { margin: 1.5rem 0 0; }
+
+.form {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  margin: 1.25rem 0 0;
+  padding: 1.1rem 1.15rem 1.25rem;
+  border: 1px solid var(--caramel-soft);
+  border-radius: var(--radius);
+  background: var(--card);
+  box-shadow: var(--shadow);
+}
+
+.form[hidden] { display: none; }
+.form__title { margin: 0 0 .9rem; font-size: 1.2rem; }
+.form__grid { display: grid; grid-template-columns: 1fr 1fr; gap: .7rem; }
+.form__full { grid-column: 1 / -1; }
+
+label.field { display: flex; flex-direction: column; gap: .25rem; }
+
+.field__label {
+  font-size: .7rem;
+  font-weight: 700;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+input[type="text"], input[type="number"], textarea {
+  width: 100%;
+  padding: .5rem .65rem;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--paper);
+  font: inherit;
+  font-size: .95rem;
+  color: var(--espresso);
+}
+
+textarea { min-height: 4.5rem; resize: vertical; }
+
+.check { flex-direction: row; align-items: center; gap: .5rem; }
+.check input { width: 1.15rem; height: 1.15rem; accent-color: var(--leaf); }
+.check .field__label { letter-spacing: .04em; }
+
+.photo { margin-top: .7rem; }
+.photo__actions { display: flex; align-items: center; gap: .7rem; margin-top: .5rem; }
+.photo__note { font-size: .8rem; color: var(--muted); }
+
+.photo__frame {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  min-height: 7rem;
+  margin-top: .6rem;
+  overflow: hidden;
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+  background: var(--crema);
+}
+
+.photo__frame[data-state] { display: flex; }
+.photo__frame img { max-width: 100%; max-height: 12rem; object-fit: contain; }
+.photo__frame span { padding: .5rem; font-size: .85rem; color: var(--clay); }
+
+.form__actions { display: flex; gap: .6rem; margin-top: 1rem; }
+.form__actions .btn { flex: 1; }
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 1rem;
+  transform: translateX(-50%);
+  width: min(100% - 1.5rem, 30rem);
+  padding: .7rem .9rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--espresso);
+  box-shadow: 0 10px 30px rgba(51, 32, 26, .3);
+  color: #fdf8f2;
+  font-size: .9rem;
+}
+
+.toast[hidden] { display: none; }
+.toast--bad { background: var(--clay); }
+.toast--bad[data-long] { font-size: .85rem; }
+
+.empty {
+  margin: 2rem 0;
+  padding: 1.5rem;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius);
+  text-align: center;
+  color: var(--muted);
+  font-size: .9rem;
+}
+
+@media (max-width: 30rem) {
+  .form__grid { grid-template-columns: 1fr; }
+  .row__desc { display: none; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">Menu editor</p>
+      <h1>The Daily Grind</h1>
+    </div>
+    <button id="reload" class="btn btn--ghost" type="button">Reload</button>
+  </header>
+
+  <p id="meta" class="meta"></p>
+  <div id="banner" class="banner" hidden></div>
+  <p id="spinner" class="spinner">Reading the sheet&hellip;</p>
+
+  <section id="formCard" class="form" hidden aria-labelledby="formTitle">
+    <h2 id="formTitle" class="form__title">Edit item</h2>
+    <div class="form__grid">
+      <label class="field form__full">
+        <span class="field__label">Item name</span>
+        <input id="fName" type="text" autocomplete="off">
+      </label>
+      <label class="field">
+        <span class="field__label">Category</span>
+        <input id="fCategory" type="text" list="categories" autocomplete="off">
+      </label>
+      <label class="field">
+        <span class="field__label">Price</span>
+        <input id="fPrice" type="text" inputmode="decimal" autocomplete="off">
+      </label>
+      <label class="field check form__full">
+        <input id="fAvailable" type="checkbox">
+        <span class="field__label">Available &mdash; untick to hide it from the public menu</span>
+      </label>
+      <label class="field form__full">
+        <span class="field__label">Description</span>
+        <textarea id="fDescription"></textarea>
+      </label>
+      <label class="field form__full">
+        <span class="field__label">Tags &mdash; comma separated</span>
+        <input id="fTags" type="text" autocomplete="off" placeholder="V, GF, caffeine free">
+      </label>
+      <label class="field form__full">
+        <span class="field__label">Photo &mdash; Drive share link or file ID</span>
+        <input id="fImage" type="text" autocomplete="off" spellcheck="false">
+      </label>
+    </div>
+    <div class="photo">
+      <div class="photo__actions">
+        <button id="fPreview" class="btn btn--ghost" type="button">Check photo</button>
+        <span id="fPhotoNote" class="photo__note"></span>
+      </div>
+      <div id="fPhoto" class="photo__frame"></div>
+    </div>
+    <div class="form__actions">
+      <button id="fCancel" class="btn btn--ghost" type="button">Cancel</button>
+      <button id="fSave" class="btn" type="button">Save item</button>
+    </div>
+  </section>
+
+  <div class="listbar">
+    <button id="add" class="btn btn--wide" type="button">Add an item</button>
+  </div>
+
+  <div id="list"></div>
+
+  <datalist id="categories"></datalist>
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  const ENDPOINT = location.origin + location.pathname;
+  const DEMO = /[?&]demo=1/.test(location.search);
+  const NO_VALUES = ['no', 'n', 'false', '0', 'off', 'unavailable', 'soldout', 'x'];
+  const PHOTO_WIDTH = 800;
+
+  const state = { items: [], editing: null, busy: false, seeded: false, demoId: 0 };
+  const dom = {};
+
+  function el(tag, className, text) {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text !== undefined && text !== null) node.textContent = String(text);
+    return node;
+  }
+
+  function fold(value) {
+    return String(value == null ? '' : value).replace(/\s+/g, ' ').trim();
+  }
+
+  function key(value) {
+    return String(value == null ? '' : value).toLowerCase().replace(/[^a-z0-9]+/g, '');
+  }
+
+  function isAvailable(value) {
+    const folded = key(value);
+    if (!folded) return true;
+    return NO_VALUES.indexOf(folded) === -1;
+  }
+
+  function money(value) {
+    if (value === '' || value === null || value === undefined) return '';
+    const amount = parseFloat(String(value).replace(/[^0-9.]/g, ''));
+    if (!isFinite(amount)) return '';
+    return amount.toFixed(2);
+  }
+
+  function tags(value) {
+    return fold(value).split(/[|;,/]+/).map((tag) => tag.trim()).filter(Boolean);
+  }
+
+  function toast(message, bad) {
+    dom.toast.textContent = message;
+    dom.toast.className = 'toast' + (bad ? ' toast--bad' : '');
+    if (bad && message.length > 110) dom.toast.setAttribute('data-long', 'yes');
+    else dom.toast.removeAttribute('data-long');
+    dom.toast.hidden = false;
+    clearTimeout(toast.timer);
+    toast.timer = setTimeout(() => { dom.toast.hidden = true; }, bad ? 9000 : 3200);
+  }
+
+  async function api(action, payload) {
+    if (DEMO) return demoApi(action, payload);
+    const response = await fetch(ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(Object.assign({ action }, payload || {}))
+    });
+    let data;
+    try {
+      data = await response.json();
+    } catch (err) {
+      throw new Error('The app did not answer. It may still be deploying — wait a minute and reload.');
+    }
+    if (!data || !data.ok) throw new Error((data && data.error) || 'Something went wrong.');
+    return data;
+  }
+
+  const DEMO_ROWS = [
+    ['Coffee', 'Espresso', 'A double shot of our house blend. Sweet and balanced.', '4.5', 'No', '', 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQb1OxoJy8BKWqmm-fMc9BGM2zEjlW45DaZLiHuWYbCKQ&s=10'],
+    ['Coffee', 'Flat White', 'Double ristretto with steamed milk and a thin layer of foam.', '4.75', 'Yes', '', 'https://picsum.photos/seed/flatwhite/640/420'],
+    ['Coffee', 'Cortado', 'Equal parts espresso and warm milk. Small and serious.', '4.00', 'Yes', '', 'https://picsum.photos/seed/cortado/640/420'],
+    ['Coffee', 'Filter of the Day', 'Rotating single origin brewed every twenty minutes.', '4.25', 'Yes', 'V', 'https://picsum.photos/seed/filteroftheday/640/420'],
+    ['Coffee', 'Cold Brew', 'Twelve hours in the fridge. Smooth and low acid.', '5.00', 'Yes', 'V', 'https://picsum.photos/seed/coldbrew/640/420'],
+    ['Coffee', 'Seasonal Mocha', 'Maple and sea salt espresso. Ask if it is still on.', '5.75', 'No', '', 'https://picsum.photos/seed/seasonalmocha/640/420'],
+    ['Tea & Infusions', 'Masala Chai', 'House masala steeped with black tea and steamed milk.', '4.75', 'Yes', 'V', 'https://picsum.photos/seed/malasachai/640/420'],
+    ['Tea & Infusions', 'Sencha', 'Steamed Japanese green tea. Grassy and clean.', '4.00', 'Yes', 'V', ''],
+    ['Tea & Infusions', 'Peppermint', 'Loose leaf, naturally caffeine free.', '3.50', 'Yes', 'caffeine free', 'https://picsum.photos/seed/peppermint/640/420'],
+    ['Bakery', 'Croissant', 'Butter laminated over three days. Best before ten.', '4.25', 'Yes', 'V', 'https://picsum.photos/seed/croissant/640/420'],
+    ['Bakery', 'Pain au Chocolat', 'Baked with dark chocolate batons, 70% Valrhona.', '4.75', 'Yes', 'V', 'https://drive.google.com/file/d/PASTE_A_FILE_ID/view?usp=sharing'],
+    ['Bakery', 'Olive Oil Focaccia', 'Sea salt and rosemary. Warm from the tray.', '4.00', 'Yes', 'V', ''],
+    ['Kitchen', 'Avocado Toast', 'Sourdough, smashed avocado, pickled shallot, chilli oil.', '11.5', 'Yes', 'V', 'https://picsum.photos/seed/avocadotoast/640/420'],
+    ['Kitchen', 'Shakshuka', 'Two baked eggs in a spiced tomato and pepper stew, with feta.', '12.0', 'Yes', 'V, GF', 'https://picsum.photos/seed/shakshuka/640/420'],
+    ['Kitchen', 'Grilled Cheese', 'Three cheeses and honey mustard on country loaf.', '10.5', 'Yes', 'V', 'https://picsum.photos/seed/grilledcheese/640/420'],
+    ['Kitchen', 'Lentil Bowl', 'Roasted squash, Puy lentils and tahini dressing. Add feta for 1.50.', '13.0', 'Yes', 'V, GF', 'https://picsum.photos/seed/lentilbowl/640/420']
+  ];
+
+  function seedDemo() {
+    if (state.seeded) return;
+    state.seeded = true;
+    state.items = DEMO_ROWS.map((row) => ({
+      id: 'demo-' + (state.demoId += 1),
+      rowNumber: 0,
+      category: row[0],
+      name: row[1],
+      description: row[2],
+      price: parseFloat(row[3]),
+      available: row[4],
+      tags: row[5],
+      image: row[6]
+    }));
+  }
+
+  function demoApi(action, payload) {
+    const data = payload || {};
+    if (action === 'getState') {
+      return Promise.resolve({
+        ok: true,
+        sheetName: 'menu (demo data)',
+        owner: 'demo mode',
+        items: state.items.slice()
+      });
+    }
+    if (action === 'saveItem') {
+      if (fold(data.id)) {
+        const item = state.items.filter((entry) => entry.id === fold(data.id))[0];
+        if (!item) return Promise.reject(new Error('That item is no longer here.'));
+        Object.assign(item, data.values);
+        return Promise.resolve({ ok: true, id: item.id, mode: 'patched' });
+      }
+      if (!fold(data.values && data.values.name)) {
+        return Promise.reject(new Error('A new item needs a name. Nothing has been written.'));
+      }
+      const id = 'demo-' + (state.demoId += 1);
+      state.items.push(Object.assign({ id, rowNumber: 0, available: 'Yes' }, data.values));
+      return Promise.resolve({ ok: true, id, mode: 'created' });
+    }
+    if (action === 'deleteItem') {
+      const index = state.items.map((entry) => entry.id).indexOf(fold(data.id));
+      if (index === -1) return Promise.resolve({ ok: true, mode: 'already-gone' });
+      state.items.splice(index, 1);
+      return Promise.resolve({ ok: true, mode: 'deleted' });
+    }
+    return Promise.reject(new Error('Unknown action: ' + action));
+  }
+
+  function showBanner(title, lines) {
+    dom.banner.textContent = '';
+    dom.banner.appendChild(el('strong', null, title));
+    const list = el('ol');
+    lines.forEach((line) => list.appendChild(el('li', null, line)));
+    dom.banner.appendChild(list);
+    dom.banner.hidden = false;
+  }
+
+  function hideBanner() {
+    dom.banner.hidden = true;
+    dom.banner.textContent = '';
+  }
+
+  function photoUrls(value, width) {
+    const raw = fold(value);
+    if (!raw) return [];
+    const id = photoId(raw);
+    if (id) return [
+      'https://lh3.googleusercontent.com/d/' + id + '=w' + width,
+      'https://drive.google.com/thumbnail?id=' + id + '&sz=w' + width,
+      'https://lh3.googleusercontent.com/d/' + id,
+      'https://lh3.google.com/u/0/d/' + id,
+      'https://drive.google.com/uc?export=view&id=' + id
+    ];
+    if (/^https?:\/\//i.test(raw)) return [raw];
+    return [];
+  }
+
+  function photoId(value) {
+    const raw = fold(value);
+    if (!raw) return null;
+    if (/^[A-Za-z0-9_-]{20,}$/.test(raw)) return raw;
+    if (/\/folders\//i.test(raw)) return null;
+    const patterns = [/\/file\/d\/([A-Za-z0-9_-]{10,})/, /\/d\/([A-Za-z0-9_-]{10,})/, /[?&]id=([A-Za-z0-9_-]{10,})/];
+    for (let i = 0; i < patterns.length; i += 1) {
+      const match = raw.match(patterns[i]);
+      if (match) return match[1];
+    }
+    return null;
+  }
+
+  function firstWorkingPhoto(value, width) {
+    const list = photoUrls(value, width);
+    if (!list.length) return Promise.resolve({ url: '', tried: 0, worked: 0 });
+    let index = 0;
+    function attempt() {
+      if (index >= list.length) return Promise.resolve({ url: '', tried: list.length, worked: 0 });
+      const url = list[index];
+      index += 1;
+      return new Promise((resolve) => {
+        const img = new Image();
+        let settled = false;
+        const finish = (ok) => {
+          if (settled) return;
+          settled = true;
+          img.onload = null;
+          img.onerror = null;
+          resolve(ok ? { url, tried: index, worked: 1 } : attempt());
+        };
+        const timer = setTimeout(() => finish(false), 8000);
+        img.onload = () => { clearTimeout(timer); finish(true); };
+        img.onerror = () => { clearTimeout(timer); finish(false); };
+        img.referrerPolicy = 'no-referrer';
+        img.src = url;
+      });
+    }
+    return attempt();
+  }
+
+  function paintPhoto(container, result) {
+    container.textContent = '';
+    if (result.url) {
+      const img = el('img');
+      img.alt = '';
+      img.referrerPolicy = 'no-referrer';
+      img.src = result.url;
+      container.appendChild(img);
+      container.setAttribute('data-state', 'ok');
+    } else {
+      container.appendChild(el('span', null, result.tried
+        ? 'No Drive URL form loaded. Open Share, set "Anyone with the link" to Viewer, then check again.'
+        : 'No usable photo URL or file ID in that field.'));
+      container.setAttribute('data-state', 'bad');
+    }
+  }
+
+  function buildRow(item) {
+    const available = isAvailable(item.available);
+    const row = el('article', 'row' + (available ? '' : ' row--off'));
+
+    const thumb = el('div', 'row__thumb');
+    const list = photoUrls(item.image, 120);
+    if (list.length) {
+      const img = el('img');
+      img.alt = '';
+      img.loading = 'lazy';
+      img.referrerPolicy = 'no-referrer';
+      img.src = list[0];
+      img.addEventListener('error', () => {
+        if (list[1] && img.src !== list[1]) img.src = list[1];
+        else {
+          thumb.textContent = '';
+          thumb.appendChild(el('span', null, 'no photo'));
+        }
+      });
+      thumb.appendChild(img);
+    } else {
+      thumb.appendChild(el('span', null, 'no photo'));
+    }
+    row.appendChild(thumb);
+
+    const body = el('div', 'row__body');
+    body.appendChild(el('h3', null, item.name || '(unnamed)'));
+    if (item.description) body.appendChild(el('p', 'row__desc', item.description));
+    const label = tags(item.tags).join(' · ');
+    if (label || !available) {
+      body.appendChild(el('p', 'row__tags' + (available ? '' : ' row__tags--off'),
+        label ? label : 'hidden from the public menu'));
+    }
+    row.appendChild(body);
+
+    const price = money(item.price);
+    if (price) row.appendChild(el('div', 'row__price', price));
+
+    const actions = el('div', 'row__actions');
+    const edit = el('button', 'icon', 'Edit');
+    edit.type = 'button';
+    edit.addEventListener('click', () => openForm(item));
+    const remove = el('button', 'icon icon--danger', 'Delete');
+    remove.type = 'button';
+    remove.addEventListener('click', () => removeItem(item));
+    actions.appendChild(edit);
+    actions.appendChild(remove);
+    row.appendChild(actions);
+
+    return row;
+  }
+
+  function render() {
+    dom.list.textContent = '';
+
+    if (!state.items.length) {
+      dom.list.appendChild(el('p', 'empty', 'No items found in this tab. Check the tab name in Code.gs, or add the first one.'));
+      return;
+    }
+
+    const groups = new Map();
+    state.items.forEach((item) => {
+      const name = fold(item.category) || 'Menu';
+      if (!groups.has(name)) groups.set(name, []);
+      groups.get(name).push(item);
+    });
+
+    groups.forEach((groupItems, name) => {
+      const section = el('section', 'group');
+      const heading = el('h2', 'group__title');
+      heading.appendChild(document.createTextNode(name));
+      heading.appendChild(el('span', 'group__count', groupItems.length + (groupItems.length === 1 ? ' item' : ' items')));
+      section.appendChild(heading);
+      groupItems.forEach((item) => section.appendChild(buildRow(item)));
+      dom.list.appendChild(section);
+    });
+
+    const known = [];
+    groups.forEach((_, name) => { if (known.indexOf(name) === -1) known.push(name); });
+    dom.categories.textContent = '';
+    known.forEach((name) => {
+      const option = document.createElement('option');
+      option.value = name;
+      dom.categories.appendChild(option);
+    });
+  }
+
+  function setBusy(busy) {
+    state.busy = busy;
+    dom.save.disabled = busy;
+    dom.save.textContent = busy ? 'Saving…' : 'Save item';
+    dom.add.disabled = busy;
+    dom.reload.disabled = busy;
+  }
+
+  function readForm() {
+    return {
+      category: dom.fCategory.value,
+      name: dom.fName.value,
+      description: dom.fDescription.value,
+      price: dom.fPrice.value,
+      available: dom.fAvailable.checked ? 'Yes' : 'No',
+      tags: dom.fTags.value,
+      image: dom.fImage.value
+    };
+  }
+
+  function openForm(item) {
+    state.editing = item ? { id: fold(item.id), base: Object.assign({}, item) } : { id: '', base: null };
+    dom.formTitle.textContent = item ? 'Edit item' : 'New item';
+    dom.fName.value = item ? item.name || '' : '';
+    dom.fCategory.value = item ? item.category || '' : '';
+    dom.fPrice.value = item ? money(item.price) : '';
+    dom.fDescription.value = item ? item.description || '' : '';
+    dom.fTags.value = item ? fold(item.tags) : '';
+    dom.fImage.value = item ? item.image || '' : '';
+    dom.fAvailable.checked = item ? isAvailable(item.available) : true;
+    dom.fPhoto.removeAttribute('data-state');
+    dom.fPhoto.textContent = '';
+    dom.fPhotoNote.textContent = '';
+    dom.formCard.hidden = false;
+    dom.formCard.scrollIntoView({ block: 'start' });
+    dom.fName.focus();
+  }
+
+  function closeForm() {
+    state.editing = null;
+    dom.formCard.hidden = true;
+    dom.fPhoto.removeAttribute('data-state');
+    dom.fPhoto.textContent = '';
+  }
+
+  async function checkPhoto() {
+    const value = dom.fImage.value;
+    if (!fold(value)) {
+      dom.fPhotoNote.textContent = 'No photo set.';
+      dom.fPhoto.removeAttribute('data-state');
+      dom.fPhoto.textContent = '';
+      return;
+    }
+    dom.fPreview.disabled = true;
+    dom.fPhotoNote.textContent = 'Checking…';
+    try {
+      const result = await firstWorkingPhoto(value, PHOTO_WIDTH);
+      paintPhoto(dom.fPhoto, result);
+      dom.fPhotoNote.textContent = result.url
+        ? 'Loads on form ' + result.tried + ' — this photo will show on the menu.'
+        : 'Nothing loaded. ' + result.tried + ' URL form(s) tried.';
+    } finally {
+      dom.fPreview.disabled = false;
+    }
+  }
+
+  async function save() {
+    const values = readForm();
+    if (!fold(values.name)) {
+      toast('An item needs a name.', true);
+      dom.fName.focus();
+      return;
+    }
+    const editing = state.editing;
+    setBusy(true);
+    try {
+      const result = await api('saveItem', {
+        id: editing ? editing.id : '',
+        base: editing ? editing.base : null,
+        values
+      });
+      closeForm();
+      await load(true);
+      toast(result.mode === 'created' ? 'Added “' + fold(values.name) + '”.' : 'Saved “' + fold(values.name) + '”.');
+    } catch (err) {
+      toast(err.message, true);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function removeItem(item) {
+    if (!confirm('Delete “' + (item.name || 'this item') + '” from the sheet? The public menu drops it on the next refresh.')) return;
+    setBusy(true);
+    try {
+      const result = await api('deleteItem', { id: fold(item.id) });
+      closeForm();
+      await load(true);
+      toast(result.mode === 'already-gone' ? 'That item was already gone from the sheet.' : 'Deleted “' + (item.name || 'item') + '”.');
+    } catch (err) {
+      toast(err.message, true);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function load(quiet) {
+    if (!quiet) {
+      dom.spinner.hidden = false;
+      hideBanner();
+    }
+    if (DEMO) seedDemo();
+    try {
+      const data = await api('getState');
+      state.items = data.items || [];
+      dom.meta.textContent = DEMO
+        ? 'Showing sample data. Nothing here is connected to a sheet.'
+        : 'Editing the “' + data.sheetName + '” tab as ' + data.owner +
+          '. The public menu reads the published copy of this sheet.';
+      if (DEMO) {
+        showBanner('Demo mode — nothing is saved anywhere.', [
+          'Add, edit and delete freely to see how the editor behaves.',
+          'Save these changes, then deploy the Apps Script to write to the real sheet.',
+          'Remove “?demo=1” from the address once you are ready to go live.'
+        ]);
+      }
+      render();
+    } catch (err) {
+      state.items = [];
+      dom.list.textContent = '';
+      dom.meta.textContent = '';
+      showBanner(err.message, [
+        'Open the app URL from the Deploy ▸ New deployment screen, not from the editor window.',
+        'Signed in as the cafe Google account, then reload.',
+        'If the deployment is still building, wait a minute and reload.'
+      ]);
+    } finally {
+      dom.spinner.hidden = true;
+    }
+  }
+
+  function init() {
+    [
+      'reload', 'add', 'list', 'meta', 'banner', 'spinner', 'toast', 'categories',
+      'formCard', 'formTitle', 'fName', 'fCategory', 'fPrice', 'fDescription', 'fTags',
+      'fImage', 'fAvailable', 'fPreview', 'fPhotoNote', 'fPhoto', 'fCancel', 'fSave'
+    ].forEach((id) => {
+      dom[id] = document.getElementById(id);
+    });
+
+    dom.add.addEventListener('click', () => openForm(null));
+    dom.save.addEventListener('click', save);
+    dom.cancel.addEventListener('click', closeForm);
+    dom.preview.addEventListener('click', checkPhoto);
+    dom.reload.addEventListener('click', () => load(false));
+    dom.fImage.addEventListener('change', checkPhoto);
+
+    dom.formCard.addEventListener('submit', (event) => event.preventDefault());
+    dom.fName.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') save();
+    });
+
+    window.addEventListener('beforeunload', (event) => {
+      if (!dom.formCard.hidden) {
+        event.preventDefault();
+        event.returnValue = '';
+      }
+    });
+
+    load(false);
+  }
+
+  init();
+}());
+</script>
+</body>
+</html>

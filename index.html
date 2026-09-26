@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Menu &middot; The Daily Grind</title>
-<meta name="description" content="Our current cafe menu, updated straight from the kitchen sheet.">
+<meta name="description" content="Our current cafe menu, updated straight from the kitchen sheet. Browse on your phone, order by email, and pay by UPI.">
 <meta name="color-scheme" content="light">
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -22,8 +22,52 @@
     <p class="masthead__meta">
       <span id="itemCount" class="masthead__count"></span>
       <span id="lastUpdated" class="masthead__updated"></span>
+      <span id="imageSummary" class="masthead__images"></span>
     </p>
   </header>
+
+  <section id="bench" class="bench" aria-labelledby="benchTitle" hidden>
+    <h2 id="benchTitle" class="bench__title">Drive photo URL test bench</h2>
+    <p class="bench__lead">Paste a Drive share link, a bare file ID, or any image URL. Every URL form this page knows about gets probed in order, so you can see which ones still work today.</p>
+
+    <div class="bench__controls">
+      <label class="bench__field">
+        <span class="bench__label">Image value from the sheet</span>
+        <input id="testInput" class="bench__input" type="text" spellcheck="false" placeholder="https://drive.google.com/file/d/1AbC…/view?usp=sharing">
+      </label>
+      <label class="bench__field bench__field--narrow">
+        <span class="bench__label">Width</span>
+        <select id="testWidth" class="bench__input">
+          <option value="400">400 px</option>
+          <option value="800" selected>800 px</option>
+          <option value="1200">1200 px</option>
+        </select>
+      </label>
+      <button id="testRun" class="btn" type="button">Test</button>
+      <button id="useFirstPhoto" class="btn btn--ghost" type="button">Use first photo in menu</button>
+    </div>
+
+    <p id="testVerdict" class="bench__verdict" role="status" aria-live="polite"></p>
+    <ul id="testResults" class="probes"></ul>
+
+    <div id="testEmbed" class="bench__embed" hidden>
+      <p class="bench__label">Last-resort embed (an iframe, not an <code>&lt;img&gt;</code>)</p>
+      <pre class="bench__code"><code id="testEmbedCode"></code></pre>
+      <button id="testCopy" class="btn btn--ghost" type="button">Copy iframe</button>
+    </div>
+
+    <details class="bench__notes">
+      <summary>How the fallback chain works</summary>
+      <ol class="bench__forms">
+        <li><code>https://lh3.googleusercontent.com/d/&lt;ID&gt;=w&lt;width&gt;</code> &mdash; Google&rsquo;s image CDN. Fastest and cookie-free, but only works if the file is shared <em>Anyone with the link</em>.</li>
+        <li><code>https://drive.google.com/thumbnail?id=&lt;ID&gt;&amp;sz=w&lt;width&gt;</code> &mdash; the thumbnail endpoint. Usually survives when the direct CDN link is blocked.</li>
+        <li><code>https://lh3.googleusercontent.com/d/&lt;ID&gt;</code> &mdash; the same CDN with no size hint, so you get the original upload.</li>
+        <li><code>https://lh3.google.com/u/0/d/&lt;ID&gt;</code> &mdash; the Drive web host, which is stricter about referrers.</li>
+        <li><code>https://drive.google.com/uc?export=view&amp;id=&lt;ID&gt;</code> &mdash; the classic form. This has been unreliable since 2024 because of third-party cookie changes, so it is tried last.</li>
+      </ol>
+      <p class="bench__lead">The card tries these in order and uses the first one that actually paints. A photo only counts as loaded when the browser reports a decoded image, so a login page served with a 200 does not fool it.</p>
+    </details>
+  </section>
 
   <main>
     <div id="status" class="status" role="status" aria-live="polite">
@@ -45,13 +89,115 @@
   <footer class="footer">
     <p>Prices include tax. Ask about allergens before ordering.</p>
     <button type="button" id="refresh" class="btn btn--ghost" hidden>Refresh menu</button>
+    <p class="footer__credit">Photos come from the <code>Image</code> column of the published Google Sheet. Card photos that fail are listed in the browser console. Orders are emailed to the cafe and paid by UPI &mdash; nothing is charged on this page.</p>
     <p class="footer__credit">Copyright &copy;<script>document.write(new Date().getFullYear());</script> All rights reserved | This template is made with <span aria-hidden="true">&hearts;</span> by <a href="https://ali-akbar-k.github.io/PORTFOLIO/" target="_blank" rel="noopener noreferrer">Ali-Akbar-K</a></p>
   </footer>
 
 </div>
 
+<button type="button" id="cartBar" class="cart-bar" hidden>
+  <span id="cartBarCount" class="cart-bar__count"></span>
+  <span class="cart-bar__total">Total <strong id="cartBarTotal"></strong></span>
+  <span class="cart-bar__cta">View order &rsaquo;</span>
+</button>
+
+<aside id="cart" class="cart" role="dialog" aria-modal="true" aria-labelledby="cartTitle" data-ready="false" hidden>
+  <div class="cart__scrim" data-close></div>
+
+  <div class="cart__panel">
+    <header class="cart__head">
+      <h2 id="cartTitle" class="cart__title">Your order</h2>
+      <button type="button" id="cartClose" class="cart__close" data-close aria-label="Close your order">&times;</button>
+    </header>
+
+    <div class="cart__body">
+
+      <section id="stepCart" class="cart__step" aria-label="Items in your order">
+        <p id="cartEmpty" class="cart__empty">Nothing here yet. Add something from the menu.</p>
+        <ul id="cartLines" class="lines"></ul>
+        <p id="cartNotice" class="note" role="status" hidden></p>
+
+        <div class="cart__row cart__row--total">
+          <span>Total</span>
+          <strong id="cartTotal"></strong>
+        </div>
+
+        <div class="cart__actions">
+          <button type="button" id="cartClear" class="btn btn--ghost" hidden>Empty order</button>
+          <button type="button" id="cartStart" class="btn" disabled>Continue</button>
+        </div>
+      </section>
+
+      <section id="stepEmail" class="cart__step" aria-label="Your email address" hidden>
+        <form id="orderForm" novalidate>
+          <p class="cart__lead">Where should we send the order confirmation?</p>
+
+          <label class="field">
+            <span class="field__label">Your email</span>
+            <input id="orderEmail" class="field__input" type="email" name="email"
+                   autocomplete="email" inputmode="email" spellcheck="false"
+                   placeholder="name@example.com">
+          </label>
+
+          <label class="field field--trap" aria-hidden="true">
+            <span class="field__label">Website</span>
+            <input id="orderWebsite" class="field__input" type="text" name="website"
+                   tabindex="-1" autocomplete="off">
+          </label>
+
+          <p id="orderStatus" class="note" role="status" hidden></p>
+
+          <div class="cart__actions">
+            <button type="submit" id="orderSubmit" class="btn btn--wide">Send order</button>
+          </div>
+
+          <p class="cart__fine">We email your order to the cafe and then show a UPI QR code to pay. No card details are collected here.</p>
+        </form>
+      </section>
+
+      <section id="stepPay" class="cart__step" aria-label="Pay for your order" hidden>
+        <div class="pay">
+          <p class="pay__label">Scan to pay</p>
+          <p id="payTotal" class="pay__amount"></p>
+          <p class="pay__order">Order <span id="payId"></span></p>
+
+          <div id="qrBox" class="qr"></div>
+
+          <p class="pay__hint">Scan with any UPI app &mdash; Google Pay, PhonePe, Paytm, BHIM.</p>
+
+          <div class="cart__actions">
+            <a id="upiLink" class="btn btn--wide" href="#" hidden>Open UPI app</a>
+          </div>
+          <div class="cart__actions">
+            <button type="button" id="upiCopy" class="btn btn--ghost" hidden>Copy UPI link</button>
+          </div>
+
+          <p id="payStatus" class="note" role="status" hidden></p>
+
+          <div class="cart__actions">
+            <button type="button" id="claimBtn" class="btn btn--wide" disabled>I've paid</button>
+          </div>
+
+          <p class="pay__verify">The cafe checks their UPI app before starting your order, so it can take a minute.</p>
+
+          <div class="cart__actions">
+            <button type="button" id="orderAgain" class="btn btn--ghost" hidden>Start a new order</button>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</aside>
+
+<p id="cartLive" class="status status--sr" role="status" aria-live="polite"></p>
+
 <script src="site-config.js" defer></script>
+<script src="image-urls.js" defer></script>
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5/papaparse.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js" defer></script>
+<script src="order.js" defer></script>
 <script src="script.js" defer></script>
 </body>
 </html>

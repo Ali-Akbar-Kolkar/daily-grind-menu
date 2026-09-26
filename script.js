@@ -3,12 +3,18 @@
 
   const CONFIG = {
     csvUrl: '',
-    localSample: 'menu.csv',
-    currency: 'USD',
+    localSample: 'menu-images.csv',
+    currency: window.MENU_CURRENCY || 'USD',
     locale: undefined,
     timeoutMs: 15000,
-    bustCache: true
+    bustCache: true,
+    imageWidth: 800,
+    imageTimeoutMs: 8000
   };
+
+  const MenuImages = window.MenuImages || null;
+  /* order.js is optional: the menu must still render if it fails to load */
+  const CafeOrder = window.CafeOrder || null;
 
   const configured = String(window.MENU_CSV_URL || CONFIG.csvUrl || '').trim();
   const dataSource = configured || CONFIG.localSample;
@@ -20,7 +26,9 @@
     description: ['description', 'desc', 'details', 'detail', 'info', 'notes'],
     price: ['price', 'cost', 'amount', 'rate'],
     available: ['available', 'availability', 'isavailable', 'instock', 'status', 'soldout'],
-    tags: ['tags', 'tag', 'dietary', 'diet', 'labels']
+    tags: ['tags', 'tag', 'dietary', 'diet', 'labels'],
+    image: ['image', 'imageurl', 'imagelink', 'photo', 'photourl', 'picture', 'thumbnail', 'img', 'imageid'],
+    driveid: ['driveid', 'drivefileid', 'fileid', 'gdriveid']
   };
 
   const UNAVAILABLE = new Set(['no', 'n', 'false', '0', 'off', 'unavailable', 'soldout', 'x']);
@@ -37,11 +45,21 @@
   }
 
   const dom = {};
+  const imageCache = new Map();
+  let imageStats = { attempted: 0, loaded: 0, failed: 0, noPhoto: 0 };
+  let pendingImages = 0;
+  let lastItems = [];
 
   function el(tag, className) {
     const node = document.createElement(tag);
     if (className) node.className = className;
     return node;
+  }
+
+  function now() {
+    return typeof performance === 'object' && performance && performance.now
+      ? performance.now()
+      : Date.now();
   }
 
   function normalizeKey(value) {
@@ -102,10 +120,10 @@
   }
 
   function parsePrice(raw) {
-    const text = String(raw == null ? '' : raw).trim();
-    if (!text) return null;
-    const value = parseFloat(text.replace(/[^0-9.]/g, ''));
-    return Number.isFinite(value) ? value : null;
+    const value = String(raw == null ? '' : raw).trim();
+    if (!value) return null;
+    const parsed = parseFloat(value.replace(/[^0-9.]/g, ''));
+    return Number.isFinite(parsed) ? parsed : null;
   }
 
   function formatPrice(value) {
@@ -147,14 +165,103 @@
         name,
         description: cell('description'),
         price: parsePrice(cell('price')),
-        tags: parseTags(cell('tags'))
+        tags: parseTags(cell('tags')),
+        image: cell('image') || cell('driveid')
       });
     }
     return items;
   }
 
+  function resetImageStats() {
+    imageCache.clear();
+    imageStats = { attempted: 0, loaded: 0, failed: 0, noPhoto: 0 };
+    pendingImages = 0;
+    updateImageSummary();
+  }
+
+  function updateImageSummary() {
+    if (!dom.imageSummary) return;
+    if (!imageStats.attempted) {
+      dom.imageSummary.textContent = imageStats.noPhoto
+        ? imageStats.noPhoto + (imageStats.noPhoto === 1 ? ' item has no photo' : ' items have no photo')
+        : '';
+      return;
+    }
+    if (pendingImages > 0) {
+      dom.imageSummary.textContent = 'checking photos…';
+      return;
+    }
+    const parts = [imageStats.loaded + '/' + imageStats.attempted + ' photos loaded'];
+    if (imageStats.failed) parts.push(imageStats.failed + ' failed');
+    dom.imageSummary.textContent = parts.join(' · ');
+  }
+
+  async function paintImage(media, img, list) {
+    const key = list[0] + '|' + list.length;
+    let pending = imageCache.get(key);
+    if (!pending) {
+      pending = MenuImages.resolveFirst(list, (url) => MenuImages.probeImage(url, CONFIG.imageTimeoutMs));
+      imageCache.set(key, pending);
+    }
+    const settled = await pending;
+
+    if (settled.url) {
+      img.src = settled.url;
+      img.addEventListener('load', () => {
+        media.className = 'card__media card__media--ready';
+      });
+      img.addEventListener('error', () => {
+        media.className = 'card__media card__media--failed';
+        media.title = 'Probed OK but failed to paint: ' + settled.url;
+      });
+    } else {
+      media.className = 'card__media card__media--failed';
+      media.title = 'No Drive URL form loaded. Tried:\n' +
+        settled.attempts.map((attempt) => ' - ' + attempt.url).join('\n');
+    }
+
+    imageStats.loaded += settled.url ? 1 : 0;
+    imageStats.failed += settled.url ? 0 : 1;
+    pendingImages -= 1;
+    updateImageSummary();
+  }
+
+  function buildMedia(item) {
+    const media = el('figure', 'card__media');
+    const list = MenuImages.candidates(item.image, { width: CONFIG.imageWidth });
+
+    if (!list.length) {
+      media.className = 'card__media card__media--none';
+      const note = el('span', 'card__media-note');
+      note.textContent = MenuImages.classify(item.image).kind === 'folder'
+        ? 'Drive folder link'
+        : 'No photo';
+      media.appendChild(note);
+      imageStats.noPhoto += 1;
+      return media;
+    }
+
+    const placeholder = el('span', 'card__media-ph');
+    placeholder.setAttribute('aria-hidden', 'true');
+    media.appendChild(placeholder);
+
+    const img = el('img', 'card__photo');
+    img.alt = item.name;
+    img.loading = 'lazy';
+    img.decoding = 'async';
+    img.referrerPolicy = 'no-referrer';
+    media.appendChild(img);
+
+    imageStats.attempted += 1;
+    pendingImages += 1;
+    paintImage(media, img, list);
+    return media;
+  }
+
   function buildCard(item) {
     const card = el('article', 'card');
+    card.appendChild(buildMedia(item));
+
     const head = el('div', 'card__head');
     const name = el('h3', 'card__name');
     name.textContent = item.name;
@@ -176,6 +283,11 @@
       const tag = el('p', 'card__tag');
       tag.textContent = item.tags.join(' \u00b7 ');
       card.appendChild(tag);
+    }
+    if (CafeOrder && item.price !== null) {
+      const actions = el('div', 'card__actions');
+      actions.appendChild(CafeOrder.makeAddButton(item));
+      card.appendChild(actions);
     }
     return card;
   }
@@ -208,6 +320,9 @@
 
     dom.menu.textContent = '';
     dom.menu.appendChild(fragment);
+    updateImageSummary();
+    /* order.js re-prices anything already in the cart against this menu */
+    if (CafeOrder) CafeOrder.setMenu(items);
   }
 
   function announce(message) {
@@ -223,6 +338,7 @@
     dom.refresh.hidden = true;
     dom.count.textContent = '';
     dom.updated.textContent = '';
+    dom.imageSummary.textContent = '';
 
     dom.status.hidden = false;
     dom.status.className = 'status status--error';
@@ -252,6 +368,7 @@
   function showMenu(items, loadedAt) {
     dom.skeletons.hidden = true;
     dom.menu.setAttribute('aria-busy', 'false');
+    lastItems = items;
     render(items);
 
     const plural = items.length === 1 ? 'item' : 'items';
@@ -287,6 +404,7 @@
 
   async function load() {
     setLoading();
+    resetImageStats();
 
     const urls = isRemote && CONFIG.bustCache ? [withCacheBuster(dataSource), dataSource] : [dataSource];
     let text;
@@ -322,15 +440,162 @@
     showMenu(items, new Date());
   }
 
+  function probeRow(url) {
+    const row = el('li', 'probe');
+    const thumb = el('img', 'probe__thumb');
+    thumb.alt = '';
+    thumb.loading = 'lazy';
+    thumb.referrerPolicy = 'no-referrer';
+    row.appendChild(thumb);
+
+    const body = el('div', 'probe__body');
+    const labelNode = el('p', 'probe__url');
+    labelNode.textContent = url;
+    const chip = el('p', 'probe__chip');
+    chip.textContent = 'testing…';
+    body.appendChild(labelNode);
+    body.appendChild(chip);
+    row.appendChild(body);
+
+    dom.testResults.appendChild(row);
+    return { row, thumb, chip };
+  }
+
+  function showEmbed(fileId) {
+    if (!dom.testEmbed) return;
+    const snippet = MenuImages.iframeSnippet(fileId, 640, 400);
+    if (!snippet) {
+      dom.testEmbed.hidden = true;
+      return;
+    }
+    dom.testEmbed.hidden = false;
+    dom.testEmbedCode.textContent = snippet;
+  }
+
+  async function runTester() {
+    const raw = String(dom.testInput.value || '').trim();
+    const width = Number(dom.testWidth.value) || CONFIG.imageWidth;
+    const info = MenuImages.classify(raw);
+
+    dom.testResults.textContent = '';
+    dom.testVerdict.textContent = '';
+    dom.testEmbed.hidden = true;
+
+    const list = MenuImages.candidates(raw, { width });
+    if (info.kind === 'drive') showEmbed(info.fileId);
+
+    if (!raw) {
+      dom.testVerdict.textContent = 'Paste a Drive share link, a bare file ID, or any https image URL.';
+      return;
+    }
+    if (/^\s*</.test(raw)) {
+      dom.testVerdict.textContent = 'That is pasted HTML, not a URL. Put only the link or the file ID in the cell.';
+      return;
+    }
+    if (!list.length) {
+      dom.testVerdict.textContent = 'No usable image URL found in that value. Detected: ' +
+        MenuImages.label(raw) + '.';
+      return;
+    }
+
+    let firstOk = -1;
+    for (let i = 0; i < list.length; i += 1) {
+      const probe = probeRow(list[i]);
+      const started = now();
+      const ok = await MenuImages.probeImage(list[i], CONFIG.imageTimeoutMs);
+      const ms = Math.max(0, Math.round(now() - started));
+      probe.thumb.src = list[i];
+      probe.row.className = 'probe probe--' + (ok ? 'ok' : 'fail');
+      probe.chip.textContent = ok ? 'loaded in ' + ms + ' ms' : 'failed after ' + ms + ' ms';
+      if (ok && firstOk === -1) firstOk = i;
+    }
+
+    if (firstOk === -1) {
+      dom.testVerdict.textContent = 'None of the ' + list.length + ' URL forms loaded. If this is your file, ' +
+        'open Share and set "Anyone with the link" to Viewer, then retest. If it is already shared, Drive is ' +
+        'refusing cross-site <img> loads — use the embed iframe above or host the photo outside Drive.';
+      return;
+    }
+
+    dom.testVerdict.textContent = 'Works. Candidate ' + (firstOk + 1) + ' of ' + list.length + ': ' +
+      list[firstOk] + (firstOk === 0
+        ? ' — first choice, nothing else needed.'
+        : ' — candidates 1 to ' + firstOk + ' failed, so keep the fallback chain.');
+  }
+
+  async function copyEmbed() {
+    const snippet = dom.testEmbedCode.textContent;
+    if (!snippet) return;
+    try {
+      await navigator.clipboard.writeText(snippet);
+      dom.testCopy.textContent = 'Copied';
+    } catch (err) {
+      dom.testCopy.textContent = 'Copy failed — select the code manually';
+    }
+    setTimeout(() => {
+      dom.testCopy.textContent = 'Copy iframe';
+    }, 2000);
+  }
+
+  function fillTesterWith(item) {
+    const first = items.find((entry) => entry.image);
+    if (!first) return;
+    dom.testInput.value = first.image;
+    runTester();
+  }
+
+  /* The bench is a developer tool, so it is hidden on the live page and only
+     revealed with ?bench=1. A cafe's customers should not be shown a form for
+     pasting Drive URLs. It stays fully wired up either way. */
+  function initBench() {
+    dom.bench = document.getElementById('bench');
+    dom.testInput = document.getElementById('testInput');
+    dom.testWidth = document.getElementById('testWidth');
+    dom.testRun = document.getElementById('testRun');
+    dom.testResults = document.getElementById('testResults');
+    dom.testVerdict = document.getElementById('testVerdict');
+    dom.testEmbed = document.getElementById('testEmbed');
+    dom.testEmbedCode = document.getElementById('testEmbedCode');
+    dom.testCopy = document.getElementById('testCopy');
+
+    if (!benchWanted()) {
+      if (dom.bench) dom.bench.remove();
+      return;
+    }
+    if (dom.bench) dom.bench.hidden = false;
+
+    dom.testRun.addEventListener('click', runTester);
+    dom.testInput.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') runTester();
+    });
+    dom.testCopy.addEventListener('click', copyEmbed);
+  }
+
+  function benchWanted() {
+    const loc = window.location || {};
+    if (/[?&]bench=1/.test(loc.search || '')) return true;
+    /* opening the file locally is unambiguously a developer, so show it there */
+    return loc.protocol === 'file:';
+  }
+
   function init() {
     dom.status = document.getElementById('status');
     dom.skeletons = document.getElementById('skeletons');
     dom.menu = document.getElementById('menu');
     dom.count = document.getElementById('itemCount');
     dom.updated = document.getElementById('lastUpdated');
+    dom.imageSummary = document.getElementById('imageSummary');
     dom.refresh = document.getElementById('refresh');
+    dom.useFirstPhoto = document.getElementById('useFirstPhoto');
 
     dom.refresh.addEventListener('click', load);
+    dom.useFirstPhoto.addEventListener('click', () => fillTesterWith(lastItems));
+    initBench();
+
+    if (!MenuImages) {
+      showError('image-urls.js did not load, so photos cannot be resolved. Check the file is deployed.');
+      return;
+    }
 
     if (document.readyState === 'loading') {
       document.addEventListener('DOMContentLoaded', load);
