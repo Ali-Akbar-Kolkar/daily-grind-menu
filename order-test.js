@@ -3,7 +3,7 @@
  *
  * order.js is loaded into a sandbox with a hand built DOM, a fake
  * localStorage, a fake EmailJS and a fake QRCode, so every branch of the money
- * maths, the storage rules, the UPI link and the claim state machine can be
+ * maths, the storage rules, manual payment and the claim state machine can be
  * driven without a browser or a network.
  */
 const fs = require('fs');
@@ -16,8 +16,8 @@ const DRAWER_IDS = [
   'menu', 'cartBar', 'cartBarCount', 'cartBarTotal', 'cart', 'cartClose',
   'stepCart', 'cartLines', 'cartEmpty', 'cartTotal', 'cartNotice', 'cartStart',
   'cartClear', 'stepEmail', 'orderForm', 'orderEmail', 'orderWebsite',
-  'orderSubmit', 'orderStatus', 'stepPay', 'payTotal', 'payId', 'qrBox',
-  'upiLink', 'upiCopy', 'claimBtn', 'payStatus', 'orderAgain', 'cartLive'
+  'orderSubmit', 'orderStatus', 'stepPay', 'payTotal', 'payId',
+  'claimBtn', 'payStatus', 'orderAgain', 'cartLive'
 ];
 
 /* ------------------------------------------------------------------ *
@@ -162,7 +162,7 @@ function buildDom(ids) {
   [
     ['stepCart', ['cartEmpty', 'cartLines', 'cartNotice', 'cartTotal', 'cartStart', 'cartClear']],
     ['stepEmail', ['orderForm', 'orderStatus']],
-    ['stepPay', ['payTotal', 'payId', 'qrBox', 'upiLink', 'upiCopy', 'payStatus', 'claimBtn', 'orderAgain']]
+    ['stepPay', ['payTotal', 'payId', 'payStatus', 'claimBtn', 'orderAgain']]
   ].forEach(([parent, kids]) => {
     kids.forEach((kid) => byId[parent].appendChild(byId[kid]));
   });
@@ -228,12 +228,10 @@ const LIVE_CONFIG = {
     receiptTemplateId: 'template_rcpt1',
     publicKey: 'pk_abc123'
   },
-  upi: { vpa: 'cafename@okhdfcbank', payeeName: 'The Daily Grind', merchantCode: '' },
   currency: 'INR',
   locale: 'en-IN',
   maxQtyPerLine: 20,
   maxLines: 30,
-  resendCooldownMs: 15000,
   copyToCustomer: true,
   storageKey: 'cafecart.v1',
   demoMode: false
@@ -352,50 +350,12 @@ function section(title) {
     check('money on a whole rupee keeps .00', order.money(900) === '₹9.00', order.money(900));
   }
 
-  section('order.js: the UPI amount field');
+  section('order.js: manual payment configuration');
   {
     const { order } = await boot({ config: LIVE_CONFIG });
-    check('always two decimals', order.amountField(900) === '9.00', order.amountField(900));
-    check('never a float artefact', order.amountField(1234) === '12.34', order.amountField(1234));
-    check('no stray plus or exponent', /^\d+\.\d{2}$/.test(order.amountField(1e6)), order.amountField(1e6));
-    check('a hostile total cannot inject', order.amountField(NaN) === '0.00', order.amountField(NaN));
-  }
-
-  section('order.js: upi deep link');
-  {
-    const { order } = await boot({ config: LIVE_CONFIG });
-    const link = order.upiLink({ id: 'ORD-ABC-1234', totalPaise: 1234 });
-    check('starts with the upi scheme', link.indexOf('upi://pay?') === 0, link);
-    check('carries the vpa', link.indexOf('pa=cafename%40okhdfcbank') !== -1, link);
-    check('carries the payee name', link.indexOf('pn=The%20Daily%20Grind') !== -1, link);
-    check('amount is the exact total', link.indexOf('am=12.34') !== -1, link);
-    check('currency is INR', link.indexOf('cu=INR') !== -1, link);
-    check('note carries the order id', link.indexOf('tn=Order%20ORD-ABC-1234') !== -1, link);
-    check('transaction ref carries the order id', link.indexOf('tr=ORD-ABC-1234') !== -1, link);
-    check('separators stay literal', /&am=12\.34&cu=INR&tn=/.test(link), link);
-
-    const bare = await boot({ config: { ...LIVE_CONFIG, upi: { vpa: '', payeeName: 'X', merchantCode: '' } } });
-    check('no vpa means no link at all', bare.order.upiLink({ id: 'ORD-1', totalPaise: 100 }) === '');
-
-    const withMc = await boot({
-      config: { ...LIVE_CONFIG, upi: { vpa: 'a@b', payeeName: 'Cafe', merchantCode: '5811' } }
-    });
-    check('merchant code is appended when set',
-      withMc.order.upiLink({ id: 'ORD-1', totalPaise: 100 }).indexOf('mc=5811') !== -1);
-
-    const nasty = await boot({
-      config: { ...LIVE_CONFIG, upi: { vpa: 'a@b', payeeName: 'Bad\\Name{"<>', merchantCode: '' } }
-    });
-    const nastyLink = nasty.order.upiLink({ id: 'ORD-1', totalPaise: 100 });
-    check('payee name cannot break the link',
-      nastyLink.indexOf('\\') === -1 && nastyLink.indexOf('{') === -1 && nastyLink.indexOf('"') === -1,
-      nastyLink);
-
-    const long = await boot({
-      config: { ...LIVE_CONFIG, upi: { vpa: 'a@b', payeeName: 'x'.repeat(90), merchantCode: '' } }
-    });
-    check('payee name is capped at 50 chars',
-      decodeURIComponent(/pn=([^&]*)/.exec(long.order.upiLink({ id: 'O', totalPaise: 1 }))[1]).length === 50);
+    check('the payment flow does not expose an in-app UPI link', order.upiLink === undefined);
+    check('ordering needs no UPI VPA', order.orderable() === true);
+    check('both owner email templates are required', order.paymentReady() === true);
   }
 
   section('order.js: email validation');
@@ -429,7 +389,7 @@ function section(title) {
     const { order } = await boot({ config: LIVE_CONFIG });
     const id = order.makeOrderId(1700000000000, 'ABCD');
     check('is prefixed and timestamped', /^ORD-[0-9A-Z]+-ABCD$/.test(id), id);
-    check('is url safe for a UPI note', /^[A-Za-z0-9-]+$/.test(id), id);
+    check('is safe to use as an order reference', /^[A-Za-z0-9-]+$/.test(id), id);
     const a = order.makeOrderId();
     const b = order.makeOrderId();
     check('two ids in a row differ', a !== b, a + ' / ' + b);
@@ -514,7 +474,7 @@ function section(title) {
     first.order.add(keyFor(first.order, 'Flat White'), 1);
     first.order.add(keyFor(first.order, 'Croissant'), 2);
     const saved = JSON.parse(first.store.getItem('cafecart.v1'));
-    check('the cart is written to storage', saved && saved.v === 1, JSON.stringify(saved));
+    check('the cart is written to storage', saved && saved.v === 2, JSON.stringify(saved));
     check('both lines are stored', saved.lines.length === 2, String(saved.lines.length));
     check('prices are stored as paise', saved.lines[0].pricePaise === 475, String(saved.lines[0].pricePaise));
 
@@ -524,6 +484,16 @@ function section(title) {
     check('the total is restored exactly', second.order.totalPaise() === 475 + 325 * 2, String(second.order.totalPaise()));
     check('the restored lines are marked gone until the menu arrives',
       second.order.lines().every((line) => line.gone === false));
+
+    const legacyStore = fakeStorage({
+      'cafecart.v1': JSON.stringify({
+        v: 1,
+        lines: [{ key: 'legacy', name: 'Saved item', pricePaise: 250, qty: 2 }]
+      })
+    });
+    const legacy = await boot({ config: LIVE_CONFIG, storage: legacyStore });
+    check('a cart saved by the previous schema is retained',
+      legacy.order.itemCount() === 2 && legacy.order.totalPaise() === 500);
 
     const cleared = await boot({ config: LIVE_CONFIG });
     cleared.order.setMenu(MENU);
@@ -593,6 +563,24 @@ function section(title) {
     noStorage.order.add(keyFor(noStorage.order, 'Flat White'), 1);
     check('a browser with storage blocked still takes orders',
       noStorage.order.itemCount() === 1 && noStorage.order.totalPaise() === 475);
+  }
+
+  section('order.js: invalid pending orders do not resume');
+  {
+    const cartLine = { key: 'flat-white|coffee', name: 'Flat White', pricePaise: 475, qty: 1 };
+    const invalidOrder = {
+      id: 'ORD-ABC-1234',
+      email: 'customer@example.com',
+      totalPaise: 999,
+      lines: [cartLine],
+      createdAt: 1700000000000
+    };
+    const store = fakeStorage({
+      'cafecart.v1': JSON.stringify({ v: 2, lines: [cartLine], order: invalidOrder })
+    });
+    const { order } = await boot({ config: LIVE_CONFIG, storage: store });
+    check('a mismatched persisted total is not trusted', order.phase() === 'cart');
+    check('the recoverable cart itself is retained', order.itemCount() === 1 && order.totalPaise() === 475);
   }
 
   section('order.js: the menu can change under the cart');
@@ -682,7 +670,7 @@ function section(title) {
     check('the line list itemises both lines',
       /2 x Flat White @ ₹4\.75 = ₹9\.50/.test(params.order_lines) &&
       /1 x Croissant @ ₹3\.25 = ₹3\.25/.test(params.order_lines), params.order_lines);
-    check('the UPI link is included in the email', params.pay_link.indexOf('upi://pay?') === 0, params.pay_link);
+    check('the order email has no payment link', params.pay_link === undefined);
     check('the email has no to_email, so it cannot be aimed at the customer',
       params.to_email === undefined, String(params.to_email));
 
@@ -690,13 +678,28 @@ function section(title) {
     check('the pay step is showing', order.step() === 'pay' && dom.stepPay.hidden === false);
     check('the amount is on screen', dom.payTotal.textContent === '₹12.75', dom.payTotal.textContent);
     check('the order id is on screen', dom.payId.textContent === params.order_id, dom.payId.textContent);
-    check('the QR was drawn once', qrCalls.length === 1, String(qrCalls.length));
-    check('the QR encodes the exact UPI link', qrCalls[0].options.text === params.pay_link, qrCalls[0].options.text);
-    check('the QR encodes the right amount', qrCalls[0].options.text.indexOf('am=12.75') !== -1);
-    check('the open-UPI-app link is wired to the same string',
-      dom.upiLink.getAttribute('href') === params.pay_link, dom.upiLink.getAttribute('href'));
+    check('customer is told the cafe will email its QR', /check your email.*payment QR/i.test(dom.payStatus.textContent),
+      dom.payStatus.textContent);
+    check('the app does not generate a QR', qrCalls.length === 0, String(qrCalls.length));
+    const pending = JSON.parse(store.getItem('cafecart.v1'));
+    check('the pending order is persisted', pending.v === 2 && pending.order.id === params.order_id);
     check("I've paid is now enabled", dom.claimBtn.disabled === false);
     check('the cart is still intact while payment is pending', order.itemCount() === 3);
+    check('a pending order cannot accept another item',
+      order.add(keyFor(order, 'Espresso'), 1).ok === false);
+    order.clearCart();
+    check('a pending order cannot be cleared before the claim', order.itemCount() === 3);
+    order.openCart('cart');
+    check('opening the cart returns to the pending payment step', order.step() === 'pay');
+    await order.submitOrder({ preventDefault() {} });
+    check('a pending order cannot be sent twice', sent.length === 1 && /already sent/i.test(dom.payStatus.textContent));
+
+    const resumed = await boot({ config: LIVE_CONFIG, storage: store });
+    check('a refresh restores the pending order', resumed.order.phase() === 'awaiting-payment');
+    check('a restored order reopens on the payment step', resumed.order.step() === 'pay' &&
+      resumed.dom.stepPay.hidden === false);
+    check('the restored payment claim is available', resumed.dom.claimBtn.disabled === false);
+    check('the restored order id is shown', resumed.dom.payId.textContent === params.order_id);
 
     await order.claimPayment({ preventDefault() {} });
 
@@ -722,7 +725,7 @@ function section(title) {
     check('the cart is emptied', order.itemCount() === 0 && order.lines().length === 0);
     check('storage is cleared', store.getItem('cafecart.v1') === null, String(store.getItem('cafecart.v1')));
     check('the cart bar is hidden again', dom.cartBar.hidden === true);
-    check('the QR is hidden', dom.qrBox.hidden === true);
+    check('no QR was generated at any point', qrCalls.length === 0);
     check('"start a new order" is offered', dom.orderAgain.hidden === false);
   }
 
@@ -843,17 +846,11 @@ function section(title) {
         paymentTemplateId: '',
         receiptTemplateId: '',
         publicKey: 'PUBLIC_KEY_XXXXXXX'
-      },
-      upi: { vpa: 'yourname@okaxis', payeeName: 'The Daily Grind', merchantCode: '' }
+      }
     };
     const { order, dom, sent } = await boot({ config: placeholders });
 
     check('placeholder ids are not treated as real', order.emailReady() === false);
-    /* The shipped UPI placeholder has an "@", so a naive "is it filled in" test
-       passes it. That used to be true, which meant a half-configured deploy
-       would build a QR code aimed at whoever owns yourname@okaxis. */
-    check('the shipped vpa placeholder is NOT treated as real',
-      order.upiReady() === false, 'vpa is ' + placeholders.upi.vpa);
     check('ordering is not live', order.orderable() === false);
     check('the drawer is marked not ready', dom.cart.getAttribute('data-ready') === 'false',
       dom.cart.getAttribute('data-ready'));
@@ -864,55 +861,24 @@ function section(title) {
     await order.submitOrder({ preventDefault() {} });
 
     check('nothing is sent', sent.length === 0, String(sent.length));
-    check('the customer is told, not shown a broken QR',
+    check('the customer is told ordering is not configured',
       /not switched on/i.test(dom.orderStatus.textContent), dom.orderStatus.textContent);
     check('the cart is kept', order.itemCount() === 1);
-    check('and no upi link was handed out to anyone',
-      order.upiLink({ id: 'ORD-1', totalPaise: 100, lines: [] }) === '',
-      order.upiLink({ id: 'ORD-1', totalPaise: 100, lines: [] }));
-
-    /* the edits people actually make: a fake VPA that looks real, or the
-       README example pasted in and half-edited. None may produce a QR code. */
-    for (const mangled of ['_X1234@okaxis', 'YOURNAME@okaxis', 'yourname@okaxis',
-                           'my_Xbank', 'PLACEHOLDER@bank', 'YOUR_NAME@okaxis']) {
-      const { order: o } = await boot({
-        config: { ...placeholders, upi: { vpa: mangled, payeeName: 'Cafe', merchantCode: '' } }
-      });
-      o.setMenu(MENU);
-      o.add(keyFor(o, 'Flat White'), 1);
-      check('a fake vpa "' + mangled + '" never becomes a qr code',
-        o.upiReady() === false && o.upiLink({ id: 'X', totalPaise: 1, lines: [] }) === '',
-        'got: ' + o.upiLink({ id: 'X', totalPaise: 1, lines: [] }));
-    }
-
-    /* ...and the realistic handles that must NOT trip the detector */
-    for (const real of ['cafename@okhdfcbank', 'a.b_c_d@okicici', 'shop-x@okaxis',
-                        'the.daily.grind@okhdfcbank', 'x@y']) {
-      const { order: o } = await boot({
-        config: { ...placeholders, emailjs: LIVE_CONFIG.emailjs, upi: { vpa: real, payeeName: 'Cafe', merchantCode: '' } }
-      });
-      check('a real vpa "' + real + '" is accepted', o.upiReady() === true);
-    }
-
-    const noUpi = await boot({
-      config: { ...placeholders, emailjs: LIVE_CONFIG.emailjs, upi: { vpa: '', payeeName: '', merchantCode: '' } }
+    const noPaymentTemplate = await boot({
+      config: { ...LIVE_CONFIG, emailjs: { ...LIVE_CONFIG.emailjs, paymentTemplateId: '' } }
     });
-    noUpi.order.setMenu(MENU);
-    noUpi.order.add(keyFor(noUpi.order, 'Flat White'), 1);
-    noUpi.dom.orderEmail.value = 'a@b.com';
-    await noUpi.order.submitOrder({ preventDefault() {} });
-    check('a missing UPI id also blocks sending', noUpi.sent.length === 0, String(noUpi.sent.length));
-    check('and the customer gets the same plain message',
-      /not switched on/i.test(noUpi.dom.orderStatus.textContent), noUpi.dom.orderStatus.textContent);
-    check('but the console names upi.vpa, so it is obvious which line to edit',
-      /upi\.vpa/.test(noUpi.logs.warn.join('\n')), JSON.stringify(noUpi.logs.warn));
-    check('configProblem stays quiet about keys that are fine',
-      !/serviceId|orderTemplateId|publicKey/.test(noUpi.logs.warn.join('\n')),
-      JSON.stringify(noUpi.logs.warn));
+    noPaymentTemplate.order.setMenu(MENU);
+    noPaymentTemplate.order.add(keyFor(noPaymentTemplate.order, 'Flat White'), 1);
+    noPaymentTemplate.dom.orderEmail.value = 'a@b.com';
+    await noPaymentTemplate.order.submitOrder({ preventDefault() {} });
+    check('a missing payment template blocks the order', noPaymentTemplate.sent.length === 0);
+    check('the diagnostic names paymentTemplateId',
+      /emailjs\.paymentTemplateId/.test(noPaymentTemplate.logs.warn.join('\n')),
+      JSON.stringify(noPaymentTemplate.logs.warn));
 
     /* the diagnostic has to actually be useful, so check a partial config too */
     const partial = await boot({
-      config: { ...placeholders, upi: { vpa: '', payeeName: 'Cafe', merchantCode: '' } }
+      config: placeholders
     });
     partial.order.setMenu(MENU);
     partial.order.add(keyFor(partial.order, 'Flat White'), 1);
@@ -922,7 +888,6 @@ function section(title) {
     check('with everything blank, all four emailjs ids are named',
       ['serviceId', 'orderTemplateId', 'paymentTemplateId', 'publicKey']
         .every((k) => diag.indexOf(k) !== -1), diag);
-    check('and the UPI id is named too', /upi\.vpa/.test(diag), diag);
   }
 
   section('order.js: no email sdk on the page');
@@ -938,7 +903,7 @@ function section(title) {
       /not switched on/i.test(dom.orderStatus.textContent), dom.orderStatus.textContent);
   }
 
-  section('order.js: a missing QR library still allows payment');
+  section('order.js: manual payment does not need a QR library');
   {
     const { order, dom, qrCalls } = await boot({ config: LIVE_CONFIG, qr: false });
     order.setMenu(MENU);
@@ -946,13 +911,9 @@ function section(title) {
     dom.orderEmail.value = 'a@b.com';
     await order.submitOrder({ preventDefault() {} });
 
-    check('no QR is drawn', qrCalls.length === 0);
-    check('the open-UPI-app link is still offered', dom.upiLink.hidden === false);
-    check('the link is the real deep link', dom.upiLink.getAttribute('href').indexOf('upi://pay?') === 0,
-      dom.upiLink.getAttribute('href'));
-    check('the copy link button is still offered', dom.upiCopy.hidden === false);
-    check('the customer is warned the image failed',
-      /QR image could not load/i.test(dom.payStatus.textContent), dom.payStatus.textContent);
+    check('no QR is generated by the page', qrCalls.length === 0);
+    check('the customer is told to check email for the cafe QR',
+      /check your email.*payment QR/i.test(dom.payStatus.textContent), dom.payStatus.textContent);
     check('paying is still possible', dom.claimBtn.disabled === false);
   }
 
@@ -970,7 +931,7 @@ function section(title) {
 
     check('no email is actually sent', sent.length === 0, String(sent.length));
     check('but the flow advances', order.phase() === 'awaiting-payment', order.phase());
-    check('the QR is drawn', qrCalls.length === 1, String(qrCalls.length));
+    check('demo does not generate a QR', qrCalls.length === 0, String(qrCalls.length));
     check('the order is logged to the console for inspection', logs.info.length === 1, String(logs.info.length));
     check('the logged payload has the right shape', /^ORD-/.test(logs.info[0][1].order_id), String(logs.info[0][1].order_id));
 
@@ -984,7 +945,7 @@ function section(title) {
     check('demoMode can be forced in config', flagged.order.demoMode() === true);
   }
 
-  section('order.js: honeypot and rate limit');
+  section('order.js: honeypot and pending-order guard');
   {
     const trap = await boot({ config: LIVE_CONFIG });
     trap.order.setMenu(MENU);
@@ -993,12 +954,12 @@ function section(title) {
     await trap.order.submitOrder({ preventDefault() {} });
 
     check('a filled honeypot sends nothing', trap.sent.length === 0, String(trap.sent.length));
-    check('and shows a normal looking success', /Thanks/.test(trap.dom.orderStatus.textContent),
+    check('and shows a normal looking success', /order received/i.test(trap.dom.orderStatus.textContent),
       trap.dom.orderStatus.textContent);
     check('no QR is drawn for a bot', trap.qrCalls.length === 0, String(trap.qrCalls.length));
     check('the cart is not cleared for a bot', trap.order.itemCount() === 1);
 
-    const spam = await boot({ config: { ...LIVE_CONFIG, resendCooldownMs: 60000 } });
+    const spam = await boot({ config: LIVE_CONFIG });
     spam.order.setMenu(MENU);
     spam.order.add(keyFor(spam.order, 'Flat White'), 1);
     spam.dom.orderEmail.value = 'a@b.com';
@@ -1006,11 +967,11 @@ function section(title) {
     check('the first order goes out', spam.sent.length === 1, String(spam.sent.length));
 
     await spam.order.submitOrder({ preventDefault() {} });
-    check('a second order inside the cooldown is blocked', spam.sent.length === 1, String(spam.sent.length));
-    check('with a countdown message', /Wait \d+s/.test(spam.dom.orderStatus.textContent), spam.dom.orderStatus.textContent);
+    check('a second order while payment is pending is blocked', spam.sent.length === 1, String(spam.sent.length));
+    check('with an existing-order message', /already sent/i.test(spam.dom.payStatus.textContent), spam.dom.payStatus.textContent);
   }
 
-  section('order.js: double submission cannot double charge');
+  section('order.js: double submission cannot duplicate an order email');
   {
     const { order, dom, sent } = await boot({ config: LIVE_CONFIG, emailjs: () => new Promise(() => {}) });
     order.setMenu(MENU);
@@ -1245,7 +1206,7 @@ function section(title) {
 
   section('order.js: a second order in the same session');
   {
-    const { order, dom, sent } = await boot({ config: { ...LIVE_CONFIG, resendCooldownMs: 0 } });
+    const { order, dom, sent, qrCalls } = await boot({ config: LIVE_CONFIG });
     order.setMenu(MENU);
     order.add(keyFor(order, 'Flat White'), 1);
     dom.orderEmail.value = 'first@example.com';
@@ -1271,10 +1232,10 @@ function section(title) {
       sent[0].params.order_id + ' / ' + sent[3].params.order_id);
     check('and the new email', sent[3].params.customer_email === 'second@example.com');
     check('and the new total', sent[3].params.order_total === '6.50', sent[3].params.order_total);
-    check('and a freshly drawn QR', dom.qrBox.hidden === false);
+    check('and no client QR was generated', qrCalls.length === 0);
   }
 
-  section('order.js: the UPI link always matches what the QR shows');
+  section('order.js: order and payment emails use the same manual order details');
   {
     const { order, dom, qrCalls, sent } = await boot({ config: LIVE_CONFIG });
     order.setMenu(MENU);
@@ -1284,17 +1245,13 @@ function section(title) {
     await order.submitOrder({ preventDefault() {} });
     await order.claimPayment({ preventDefault() {} });
 
-    const emailed = sent[0].params.pay_link;
-    const drawn = qrCalls[0].options.text;
-    const button = dom.upiLink.getAttribute('href');
-    const claim = sent[1].params.pay_link;
-
-    check('the emailed link, the QR and the button all match',
-      emailed === drawn && drawn === button && button === claim,
-      [emailed, drawn, button, claim].join(' | '));
-    check('the amount in the link equals the cart total', /am=16\.75/.test(drawn), drawn);
-    check('the amount in the link equals the amount on screen',
-      /am=16\.75/.test(drawn) && dom.payTotal.textContent === '₹16.75', dom.payTotal.textContent);
+    check('order email includes the exact total', sent[0].params.order_total === '16.75');
+    check('payment claim includes the same total', sent[1].params.order_total === sent[0].params.order_total);
+    check('both emails include the same order id', sent[1].params.order_id === sent[0].params.order_id);
+    check('neither email includes a payment link',
+      sent.every((mail) => mail.params.pay_link === undefined));
+    check('the total is shown while waiting', dom.payTotal.textContent === '₹16.75', dom.payTotal.textContent);
+    check('the page never generated a QR', qrCalls.length === 0, String(qrCalls.length));
   }
 
   section('index.html wires up every id order.js looks for');
@@ -1320,7 +1277,7 @@ function section(title) {
     check('order.js loads before script.js so cards can ask for a button',
       html.indexOf('src="order.js"') < html.indexOf('src="script.js"'));
     check('the emailjs sdk is loaded', /@emailjs\/browser/.test(html));
-    check('the qr library is loaded', /qrcodejs|qrcode\.min\.js/.test(html));
+    check('the QR library is not loaded', !/qrcodejs|qrcode\.min\.js/.test(html));
     check('the drawer is a labelled modal', /id="cart"[^>]*role="dialog"/.test(html) ||
       /role="dialog"[^>]*id="cart"/.test(html));
     check('the drawer has a close control', /id="cartClose"/.test(html));
@@ -1347,7 +1304,8 @@ function section(title) {
         /pointer-events\s*:\s*none/.test(body));
     }
     check('the pay step has an "I have paid" button', /id="claimBtn"/.test(html));
-    check('the UPI link is a real anchor, not a div', /<a[^>]*id="upiLink"/.test(html));
+    check('the manual QR email instructions are present', /cafe will email a payment QR/i.test(html));
+    check('no in-page UPI or QR controls remain', !/id="(?:qrBox|upiLink|upiCopy)"/.test(html));
   }
 
   console.log('\n' + (failures ? failures + ' check(s) FAILED' : 'all checks passed'));
