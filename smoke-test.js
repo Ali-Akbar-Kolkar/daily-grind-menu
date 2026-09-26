@@ -18,7 +18,7 @@ const FILE_ID = '1AbCdEfGhIjKlMnOpQrStUvWxYz012345';
 const DRIVE_LINK = 'https://drive.google.com/file/d/' + FILE_ID + '/view?usp=sharing';
 
 const DRIVE_CSV = [
-  'Category,Item Name,Description,Price,Available,Tags,Image',
+  'Category,Item Name,Description,Price,Available,Tags,Image URL',
   'Bakery,Croissant,Butter laminated over three days.,4.25,Yes,,' + DRIVE_LINK
 ].join('\n');
 

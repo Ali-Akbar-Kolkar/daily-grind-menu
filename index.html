@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Menu &middot; The Daily Grind</title>
-<meta name="description" content="Our current cafe menu, updated straight from the kitchen sheet. Browse on your phone, order by email, and pay by UPI.">
+<meta name="description" content="Our current cafe menu, updated straight from the kitchen sheet. Browse on your phone, order by email, and receive a payment QR from the cafe.">
 <meta name="color-scheme" content="light">
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -89,7 +89,7 @@
   <footer class="footer">
     <p>Prices include tax. Ask about allergens before ordering.</p>
     <button type="button" id="refresh" class="btn btn--ghost" hidden>Refresh menu</button>
-    <p class="footer__credit">Photos come from the <code>Image</code> column of the published Google Sheet. Card photos that fail are listed in the browser console. Orders are emailed to the cafe and paid by UPI &mdash; nothing is charged on this page.</p>
+    <p class="footer__credit">Photos come from the <code>Image</code> or <code>Image URL</code> column of the published Google Sheet. Card photos that fail are listed in the browser console. The cafe emails payment instructions after receiving an order; this page never takes payment.</p>
     <p class="footer__credit">Copyright &copy;<script>document.write(new Date().getFullYear());</script> All rights reserved | This template is made with <span aria-hidden="true">&hearts;</span> by <a href="https://ali-akbar-k.github.io/PORTFOLIO/" target="_blank" rel="noopener noreferrer">Ali-Akbar-K</a></p>
   </footer>
 
@@ -130,7 +130,7 @@
 
       <section id="stepEmail" class="cart__step" aria-label="Your email address" hidden>
         <form id="orderForm" novalidate>
-          <p class="cart__lead">Where should we send the order confirmation?</p>
+          <p class="cart__lead">What email should the cafe use to reply with your payment QR?</p>
 
           <label class="field">
             <span class="field__label">Your email</span>
@@ -151,34 +151,23 @@
             <button type="submit" id="orderSubmit" class="btn btn--wide">Send order</button>
           </div>
 
-          <p class="cart__fine">We email your order to the cafe and then show a UPI QR code to pay. No card details are collected here.</p>
+          <p class="cart__fine">We email your order to the cafe. They will reply to your email with a payment QR; this page never takes payment.</p>
         </form>
       </section>
 
-      <section id="stepPay" class="cart__step" aria-label="Pay for your order" hidden>
+      <section id="stepPay" class="cart__step" aria-label="Payment instructions" hidden>
         <div class="pay">
-          <p class="pay__label">Scan to pay</p>
+          <p class="pay__label">Payment by email</p>
           <p id="payTotal" class="pay__amount"></p>
           <p class="pay__order">Order <span id="payId"></span></p>
-
-          <div id="qrBox" class="qr"></div>
-
-          <p class="pay__hint">Scan with any UPI app &mdash; Google Pay, PhonePe, Paytm, BHIM.</p>
-
-          <div class="cart__actions">
-            <a id="upiLink" class="btn btn--wide" href="#" hidden>Open UPI app</a>
-          </div>
-          <div class="cart__actions">
-            <button type="button" id="upiCopy" class="btn btn--ghost" hidden>Copy UPI link</button>
-          </div>
+          <p class="pay__hint">The cafe will email a payment QR for this order. This page does not generate or display one.</p>
+          <p class="pay__verify">Use the cafe's QR to pay. After paying, return here and confirm; the cafe verifies payment before preparing your order.</p>
 
           <p id="payStatus" class="note" role="status" hidden></p>
 
           <div class="cart__actions">
             <button type="button" id="claimBtn" class="btn btn--wide" disabled>I've paid</button>
           </div>
-
-          <p class="pay__verify">The cafe checks their UPI app before starting your order, so it can take a minute.</p>
 
           <div class="cart__actions">
             <button type="button" id="orderAgain" class="btn btn--ghost" hidden>Start a new order</button>
@@ -196,7 +185,6 @@
 <script src="image-urls.js" defer></script>
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5/papaparse.min.js" defer></script>
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js" defer></script>
-<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js" defer></script>
 <script src="order.js" defer></script>
 <script src="script.js" defer></script>
 </body>

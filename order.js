@@ -1,5 +1,5 @@
 /*
- * order.js - cart, EmailJS order email, UPI QR, payment claim.
+ * order.js - cart, EmailJS order email, manual payment wait, payment claim.
  *
  * Loaded before script.js and owns everything about ordering. script.js only
  * hands it the parsed menu items and asks it for an "Add" button per card, so
@@ -14,7 +14,7 @@
 (function () {
   'use strict';
 
-  var STORAGE_VERSION = 1;
+  var STORAGE_VERSION = 2;
 
   var DEFAULTS = {
     emailjs: {
@@ -24,12 +24,10 @@
       receiptTemplateId: '',
       publicKey: ''
     },
-    upi: { vpa: '', payeeName: '', merchantCode: '' },
     currency: 'INR',
     locale: 'en-IN',
     maxQtyPerLine: 20,
     maxLines: 30,
-    resendCooldownMs: 15000,
     copyToCustomer: true,
     storageKey: 'cafecart.v1',
     demoMode: false
@@ -39,18 +37,11 @@
    * config
    * ------------------------------------------------------------------ */
 
-  /* Treats an unfilled placeholder as unset. The shipped UPI value is now an
-     empty string precisely so there is nothing here to miss, but people do
-     paste "yourname@bank" from the README or write "_X1234@bank" intending
-     to fill it in later, and a half-filled UPI line becomes a working QR code
-     aimed at whoever owns that VPA. So: catch the obvious shapes. A real UPI
-     handle can legally contain "_", but never "_X"/"_YOUR", so the risk of a
-     false positive here is a customer being told ordering is off, which is
-     harmless next to quietly sending money to a stranger. */
+  /* Treats unfilled EmailJS placeholders as unset. */
   function isReal(value) {
     return typeof value === 'string' &&
       value.length > 0 &&
-      !/_(X|YOUR|PLACEHOLDER)|YOUR[_-]|^PLACEHOLDER|^YOURNAME/i.test(value);
+      !/X{3,}|YOUR[_-]?NAME|PLACEHOLDER/i.test(value);
   }
 
   function merge(base, override) {
@@ -82,17 +73,11 @@
     return emailReady() && isReal(config.emailjs.receiptTemplateId);
   }
 
-  function upiReady() {
-    return isReal(config.upi.vpa) && /@/.test(config.upi.vpa);
-  }
-
   /* Exactly which values are unset, naming the site-config.js key for each.
 
      The customer only needs to be told ordering is off. The person actually
-     fixing it needs to be told WHICH line to edit, because "the cafe has not
-     added its email keys" sent me (and would send anyone) looking at EmailJS
-     when the UPI ID was the thing still blank. The detail goes to the console,
-     where the person debugging will find it, and stays off the screen. */
+    fixing it needs to be told WHICH line to edit. The detail goes to the
+    console, where the person debugging will find it, and stays off-screen. */
   function configProblem() {
     var e = config.emailjs || {};
     var missing = [];
@@ -100,9 +85,7 @@
     if (!isReal(e.orderTemplateId)) missing.push('emailjs.orderTemplateId');
     if (!isReal(e.paymentTemplateId)) missing.push('emailjs.paymentTemplateId');
     if (!isReal(e.publicKey)) missing.push('emailjs.publicKey');
-    if (!upiReady()) missing.push('upi.vpa');
     if (!sdkReady()) missing.push('the emailjs SDK script tag');
-    if (!qrReady()) missing.push('the QRCode script tag (order can send without it)');
     return missing;
   }
 
@@ -122,10 +105,6 @@
       typeof window.emailjs.send === 'function');
   }
 
-  function qrReady() {
-    return Boolean(typeof window !== 'undefined' && typeof window.QRCode === 'function');
-  }
-
   function demoForced() {
     if (config.demoMode) return true;
     try {
@@ -139,7 +118,7 @@
   var demo = demoForced();
 
   function orderable() {
-    return demo || (emailReady() && upiReady());
+    return demo || (paymentReady() && sdkReady());
   }
 
   /* ------------------------------------------------------------------ *
@@ -172,12 +151,6 @@
     var value = fromPaise(paise);
     if (formatter) return formatter.format(value);
     return config.currency + ' ' + value.toFixed(2);
-  }
-
-  /* plain number for the UPI am= field: exactly two decimals, never 9.9 or NaN */
-  function amountField(paise) {
-    if (!isFinite(paise)) return '0.00';
-    return (Math.round(paise) / 100).toFixed(2);
   }
 
   function slug(value) {
@@ -229,38 +202,6 @@
     return 'ORD-' + stamp + '-' + (salt || randomChunk(4));
   }
 
-  /*
-   * UPI deep link. Values are percent encoded, the separators stay literal,
-   * which is what the UPI apps parse. am= is always exactly two decimals.
-   */
-  function upiLink(order, upi) {
-    var settings = upi || config.upi;
-    var vpa = String(settings.vpa || '').trim();
-    /* Belt and braces: the UI already refuses to reach this point with a
-       placeholder, but this is the function that produces the thing a customer
-       scans, so it re-checks rather than trusting its callers. */
-    if (!vpa || !isReal(vpa) || vpa.indexOf('@') === -1) return '';
-
-    var payee = String(settings.payeeName || 'Cafe')
-      .replace(/[\\{}"<>]/g, '')
-      .replace(/\s+/g, ' ')
-      .trim()
-      .slice(0, 50) || 'Cafe';
-
-    var parts = [
-      'pa=' + encodeURIComponent(vpa),
-      'pn=' + encodeURIComponent(payee),
-      'am=' + amountField(order.totalPaise),
-      'cu=' + encodeURIComponent(config.currency),
-      'tn=' + encodeURIComponent('Order ' + order.id),
-      'tr=' + encodeURIComponent(order.id)
-    ];
-    if (settings.merchantCode) {
-      parts.push('mc=' + encodeURIComponent(String(settings.merchantCode).trim()));
-    }
-    return 'upi://pay?' + parts.join('&');
-  }
-
   function lineText(line) {
     return line.qty + ' x ' + line.name + ' @ ' + money(line.pricePaise) +
       ' = ' + money(line.pricePaise * line.qty);
@@ -287,10 +228,10 @@
       reply_to: order.email,
       order_lines: orderLinesText(order.lines),
       order_count: String(count),
-      order_total: amountField(order.totalPaise),
+      order_total: (order.totalPaise / 100).toFixed(2),
       order_total_display: money(order.totalPaise),
       currency: config.currency,
-      pay_link: order.upiLink || '',
+      subject: 'New order ' + order.id + ' - ' + money(order.totalPaise),
       placed_at: new Date(order.createdAt).toISOString()
     };
   }
@@ -300,11 +241,10 @@
     return {
       order_id: order.id,
       customer_email: order.email,
-      order_total: amountField(order.totalPaise),
+      order_total: (order.totalPaise / 100).toFixed(2),
       order_total_display: money(order.totalPaise),
       currency: config.currency,
       order_lines: orderLinesText(order.lines),
-      pay_link: order.upiLink || '',
       claimed_at: new Date(claimedAt).toISOString(),
       subject: 'Payment Claimed - Order ' + order.id
     };
@@ -326,8 +266,8 @@
     'menu', 'cartBar', 'cartBarCount', 'cartBarTotal', 'cart', 'cartClose',
     'stepCart', 'cartLines', 'cartEmpty', 'cartTotal', 'cartNotice', 'cartStart',
     'cartClear', 'stepEmail', 'orderForm', 'orderEmail', 'orderWebsite',
-    'orderSubmit', 'orderStatus', 'stepPay', 'payTotal', 'payId', 'qrBox',
-    'upiLink', 'upiCopy', 'claimBtn', 'payStatus', 'orderAgain', 'cartLive'
+    'orderSubmit', 'orderStatus', 'stepPay', 'payTotal', 'payId',
+    'claimBtn', 'payStatus', 'orderAgain', 'cartLive'
   ];
 
   var dom = {};
@@ -338,7 +278,6 @@
   var order = null;
   var phase = 'cart';
   var step = 'cart';
-  var lastSentAt = 0;
   var storageOk = true;
   var lastFocus = null;
 
@@ -359,7 +298,13 @@
       store.setItem(config.storageKey, JSON.stringify({
         v: STORAGE_VERSION,
         updated: Date.now(),
-        lastSentAt: lastSentAt,
+        order: order && (phase === 'awaiting-payment' || phase === 'claiming') ? {
+          id: order.id,
+          email: order.email,
+          totalPaise: order.totalPaise,
+          lines: order.lines,
+          createdAt: order.createdAt
+        } : null,
         lines: lines.map(function (line) {
           return {
             key: line.key,
@@ -396,12 +341,10 @@
     }
 
     /* corrupt, or written by a different version: drop it rather than half load */
-    if (!data || data.v !== STORAGE_VERSION || !Array.isArray(data.lines)) {
+    if (!data || (data.v !== 1 && data.v !== STORAGE_VERSION) || !Array.isArray(data.lines)) {
       try { store.removeItem(config.storageKey); } catch (ignored) { /* ignore */ }
       return;
     }
-
-    lastSentAt = Number(data.lastSentAt) || 0;
 
     data.lines.forEach(function (entry) {
       if (!entry || typeof entry.key !== 'string') return;
@@ -417,6 +360,33 @@
         gone: false
       });
     });
+
+    if (data.v === STORAGE_VERSION && isValidOrder(data.order)) {
+      order = data.order;
+      phase = 'awaiting-payment';
+    }
+  }
+
+  function isValidOrder(saved) {
+    var createdAt = Number(saved && saved.createdAt);
+    var declaredTotal = Number(saved && saved.totalPaise);
+    if (!saved || typeof saved.id !== 'string' || !/^ORD-[A-Z0-9-]+$/.test(saved.id) ||
+        !isEmail(saved.email) || !Array.isArray(saved.lines) || !saved.lines.length ||
+        saved.lines.length > config.maxLines || !isFinite(createdAt) || createdAt <= 0 ||
+        !isFinite(declaredTotal) || declaredTotal < 0 || Math.floor(declaredTotal) !== declaredTotal) return false;
+
+    var total = 0;
+    var valid = saved.lines.every(function (line) {
+      var price = Number(line && line.pricePaise);
+      var qty = Number(line && line.qty);
+      if (!line || typeof line.key !== 'string' || typeof line.name !== 'string' ||
+          !line.name || line.name.length > 200 ||
+          !isFinite(price) || price < 0 || Math.floor(price) !== price ||
+          !isFinite(qty) || qty < 1 || qty > config.maxQtyPerLine || Math.floor(qty) !== qty) return false;
+      total += price * qty;
+      return true;
+    });
+    return valid && total === declaredTotal;
   }
 
   function clearStorage() {
@@ -435,6 +405,10 @@
 
   function activeLines() {
     return lines.filter(function (line) { return !line.gone; });
+  }
+
+  function orderLocked() {
+    return phase === 'sending' || phase === 'awaiting-payment' || phase === 'claiming';
   }
 
   function totalPaise() {
@@ -458,6 +432,9 @@
   }
 
   function add(key, stepCount) {
+    if (orderLocked()) {
+      return { ok: false, reason: 'An order is already in progress. Finish it before changing the cart.' };
+    }
     var item = menuItems.get(key);
     if (!item) return { ok: false, reason: 'That item is not on the menu any more.' };
 
@@ -490,6 +467,7 @@
   }
 
   function setQty(key, qty) {
+    if (orderLocked()) return;
     var line = findLine(key);
     if (!line) return;
 
@@ -513,6 +491,7 @@
   }
 
   function remove(key) {
+    if (orderLocked()) return;
     /* if the row being removed is the thing being focused on, move focus
        somewhere real rather than dropping it on the body */
     var hadFocus = false;
@@ -535,6 +514,7 @@
   }
 
   function clearCart() {
+    if (orderLocked()) return;
     lines = [];
     notice = '';
     resetOrder();
@@ -611,6 +591,15 @@
       var item = menuItems.get(key);
       var name = item ? item.name : 'Item';
       var qty = qtyOf(key);
+
+      if (orderLocked()) {
+        button.disabled = true;
+        button.className = qty > 0 ? 'card__add card__add--in' : 'card__add';
+        button.textContent = qty > 0 ? 'Ordered \u00b7 ' + qty : 'Order pending';
+        button.setAttribute('aria-label', 'An order is already in progress. Finish it before starting another.');
+        return;
+      }
+      button.disabled = false;
 
       if (qty > 0) {
         button.className = 'card__add card__add--in';
@@ -741,7 +730,10 @@
     var blocked = blockedByMenuChange();
 
     if (dom.cartTotal) dom.cartTotal.textContent = money(totalPaise());
-    if (dom.cartClear) dom.cartClear.hidden = !count;
+    if (dom.cartClear) {
+      dom.cartClear.hidden = !count;
+      dom.cartClear.disabled = orderLocked();
+    }
 
     if (notice) {
       say(dom.cartNotice, notice + ' since you added them. Review the total before sending.', 'warn');
@@ -750,10 +742,10 @@
     }
 
     if (dom.cartStart) {
-      dom.cartStart.disabled = count === 0 || blocked;
+      dom.cartStart.disabled = count === 0 || blocked || orderLocked();
       dom.cartStart.textContent = blocked
         ? 'Remove unavailable items to continue'
-        : 'Continue';
+        : orderLocked() ? 'Order in progress' : 'Continue';
     }
 
     var busy = phase === 'sending' || phase === 'claiming';
@@ -793,7 +785,7 @@
     lastFocus = (typeof document !== 'undefined' && document.activeElement) || null;
     dom.cart.hidden = false;
     lockScroll(true);
-    showStep(nextStep || step);
+    showStep(orderLocked() ? (phase === 'sending' ? 'email' : 'pay') : (nextStep || step));
     render();
     if (dom.cartClose && typeof dom.cartClose.focus === 'function') dom.cartClose.focus();
   }
@@ -835,7 +827,7 @@
   function friendlyError(err) {
     var text = err && (err.text || err.message) ? String(err.text || err.message) : '';
     if (/limit|quota|rate/i.test(text)) {
-      return 'The cafe has hit its email limit for now. Pay by scanning the QR and tell a staff member.';
+      return 'The cafe cannot receive order emails right now. Please try again later or tell a staff member.';
     }
     if (/not found|template|service|invalid/i.test(text)) {
       return 'The order email could not be sent. Please tell a staff member your order instead.';
@@ -873,12 +865,16 @@
   async function submitOrder(event) {
     if (event && typeof event.preventDefault === 'function') event.preventDefault();
     if (phase === 'sending' || phase === 'claiming') return;
+    if (phase === 'awaiting-payment') {
+      say(dom.payStatus, 'Your order is already sent. Complete payment before starting another order.', 'warn');
+      return;
+    }
 
     /* a bot fills every field it can see */
     if (dom.orderWebsite && String(dom.orderWebsite.value || '').trim()) {
       phase = 'placed';
       showStep('pay');
-      say(dom.orderStatus, 'Thanks! Your order is being confirmed by the cafe.', 'ok');
+      say(dom.orderStatus, 'Order received. Please check your email for next steps.', 'ok');
       render();
       return;
     }
@@ -909,13 +905,7 @@
     }
 
     if (!demo) {
-      var wait = config.resendCooldownMs - (Date.now() - lastSentAt);
-      if (lastSentAt && wait > 0) {
-        say(dom.orderStatus,
-          'An order was just sent. Wait ' + Math.ceil(wait / 1000) + 's before sending another.', 'warn');
-        return;
-      }
-      if (!emailReady() || !sdkReady() || !upiReady()) {
+      if (!paymentReady() || !sdkReady()) {
         sayNotConfigured();
         return;
       }
@@ -927,7 +917,6 @@
 
     order = snapshot();
     order.email = email;
-    order.upiLink = upiLink(order);
 
     try {
       if (demo) {
@@ -944,80 +933,26 @@
       return;
     }
 
-    lastSentAt = Date.now();
-    save();
     phase = 'awaiting-payment';
+    save();
     say(dom.orderStatus, '', null);
     showStep('pay');
     render();
-    paintQr();
-    announce('Order ' + order.id + ' sent. Scan the QR code to pay ' + money(order.totalPaise) + '.');
+    say(dom.payStatus,
+      'Order sent! Please check your email. The cafe will reply with a payment QR code shortly.', 'ok');
+    announce('Order ' + order.id + ' sent. Check your email for a payment QR from the cafe.');
   }
 
   /* ------------------------------------------------------------------ *
-   * payment
+   * payment claim
    * ------------------------------------------------------------------ */
-
-  function paintQr() {
-    if (!dom.qrBox || !order) return;
-
-    dom.qrBox.textContent = '';
-    dom.qrBox.hidden = false;
-
-    if (!order.upiLink) {
-      if (dom.upiLink) dom.upiLink.hidden = true;
-      if (dom.upiCopy) dom.upiCopy.hidden = true;
-      say(dom.payStatus, 'The cafe has not added a UPI ID yet, so please pay a staff member directly.', 'warn');
-      return;
-    }
-
-    if (dom.upiLink) {
-      dom.upiLink.hidden = false;
-      dom.upiLink.setAttribute('href', order.upiLink);
-    }
-    if (dom.upiCopy) dom.upiCopy.hidden = false;
-
-    if (!qrReady()) {
-      say(dom.payStatus,
-        'The QR image could not load. Use the button below to open your UPI app, or pay a staff member.',
-        'warn');
-      return;
-    }
-
-    try {
-      new window.QRCode(dom.qrBox, {
-        text: order.upiLink,
-        width: 208,
-        height: 208,
-        colorDark: '#33201a',
-        colorLight: '#ffffff',
-        correctLevel: window.QRCode.CorrectLevel ? window.QRCode.CorrectLevel.M : 2
-      });
-    } catch (err) {
-      console.error('QR render failed:', err);
-      say(dom.payStatus, 'The QR code could not be drawn. Use the button below to open your UPI app.', 'warn');
-    }
-  }
-
-  async function copyUpi() {
-    if (!order || !order.upiLink || !dom.upiCopy) return;
-    try {
-      await navigator.clipboard.writeText(order.upiLink);
-      dom.upiCopy.textContent = 'Copied';
-    } catch (err) {
-      dom.upiCopy.textContent = 'Copy failed';
-    }
-    setTimeout(function () {
-      if (dom.upiCopy) dom.upiCopy.textContent = 'Copy UPI link';
-    }, 2000);
-  }
 
   async function claimPayment(event) {
     if (event && typeof event.preventDefault === 'function') event.preventDefault();
     if (phase !== 'awaiting-payment' || !order) return;
 
     phase = 'claiming';
-    say(dom.payStatus, 'Confirming you paid\u2026', null);
+    say(dom.payStatus, 'Sending your payment confirmation to the cafe\u2026', null);
     render();
 
     var claimedAt = Date.now();
@@ -1055,13 +990,10 @@
     phase = 'placed';
     lines = [];
     notice = '';
-    lastSentAt = 0;
     clearStorage();
     showStep('pay');
-    say(dom.payStatus, 'Thanks! Your order is being confirmed by the cafe.', 'ok');
-    if (dom.qrBox) dom.qrBox.hidden = true;
-    if (dom.upiLink) dom.upiLink.hidden = true;
-    if (dom.upiCopy) dom.upiCopy.hidden = true;
+    say(dom.payStatus,
+      'Thanks! Your payment notice was sent. The cafe will verify the payment before preparing your order.', 'ok');
     render();
     announce('Thanks. Order ' + order.id + ' is being confirmed by the cafe.');
   }
@@ -1071,10 +1003,6 @@
     clearStorage();
     if (dom.orderEmail) dom.orderEmail.value = '';
     if (dom.orderWebsite) dom.orderWebsite.value = '';
-    if (dom.qrBox) {
-      dom.qrBox.textContent = '';
-      dom.qrBox.hidden = false;
-    }
     say(dom.payStatus, '', null);
     say(dom.orderStatus, '', null);
     showStep('cart');
@@ -1156,7 +1084,6 @@
     }
     if (dom.cartClear) dom.cartClear.addEventListener('click', clearCart);
     if (dom.orderForm) dom.orderForm.addEventListener('submit', submitOrder);
-    if (dom.upiCopy) dom.upiCopy.addEventListener('click', copyUpi);
     if (dom.claimBtn) dom.claimBtn.addEventListener('click', claimPayment);
     if (dom.orderAgain) dom.orderAgain.addEventListener('click', startNewOrder);
     document.addEventListener('keydown', onKeyDown);
@@ -1165,6 +1092,11 @@
     dom.cart.setAttribute('data-ready', orderable() ? 'true' : 'false');
 
     load();
+    if (order && phase === 'awaiting-payment') {
+      showStep('pay');
+      say(dom.payStatus,
+        'Your order was sent. Check your email for the cafe\'s payment QR, then come back here to confirm payment.', 'ok');
+    }
     render();
   }
 
@@ -1179,12 +1111,10 @@
     toPaise: toPaise,
     fromPaise: fromPaise,
     money: money,
-    amountField: amountField,
     slug: slug,
     itemKey: itemKey,
     isEmail: isEmail,
     makeOrderId: makeOrderId,
-    upiLink: upiLink,
     lineText: lineText,
     orderLinesText: orderLinesText,
     orderEmailParams: orderEmailParams,
@@ -1205,8 +1135,6 @@
     emailReady: emailReady,
     paymentReady: paymentReady,
     receiptReady: receiptReady,
-    upiReady: upiReady,
-    qrReady: qrReady,
     sdkReady: sdkReady,
     orderable: orderable,
     storageAvailable: function () { return storageOk; },

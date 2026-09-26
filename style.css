@@ -515,6 +515,7 @@ code {
 }
 
 .card__add:hover { background: rgba(185, 113, 44, .1); }
+.card__add:disabled { cursor: not-allowed; opacity: .72; }
 
 .card__add--in {
   border-color: var(--leaf);
@@ -907,26 +908,10 @@ code {
   color: var(--muted);
 }
 
-.qr {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 12rem;
-  margin-bottom: .8rem;
-}
-
-.qr[hidden] { display: none; }
-
-.qr canvas,
-.qr img {
-  max-width: 100%;
-  height: auto;
-  border-radius: 10px;
-}
-
 .pay__hint {
-  margin: 0 0 .2rem;
-  font-size: .82rem;
+  margin: .65rem 0 0;
+  font-size: .9rem;
+  font-weight: 700;
   color: var(--coffee);
 }
 
