@@ -78,16 +78,14 @@ function buildSandbox({ respond }) {
   return { context: vm.createContext(sandbox), byId, documentListeners };
 }
 
-function runCase({ name, respond, papaSource, remoteUrl }) {
+function runCase({ name, respond, papaSource, configuredUrl }) {
   const { context, byId, documentListeners } = buildSandbox({ respond });
+  context.window.MENU_CSV_URL = configuredUrl || '';
   if (papaSource) {
     context.window.Papa = vm.runInNewContext(papaSource, { window: {} });
   }
 
-  const source = remoteUrl
-    ? SCRIPT.replace(/csvUrl: '[^']*'/, "csvUrl: '" + remoteUrl + "'")
-    : SCRIPT;
-  vm.runInContext(source, context, { filename: 'script.js' });
+  vm.runInContext(SCRIPT, context, { filename: 'script.js' });
 
   const ready = documentListeners.DOMContentLoaded;
   if (!ready) throw new Error(name + ': script never registered DOMContentLoaded');
@@ -185,7 +183,7 @@ async function happyPath(name, papaSource) {
   let call = 0;
   const remote = await runCase({
     name: 'remote-cachebust',
-    remoteUrl: 'https://docs.google.com/spreadsheets/d/e/FAKE/pub?gid=0&single=true&output=csv',
+    configuredUrl: 'https://docs.google.com/spreadsheets/d/e/FAKE/pub?gid=0&single=true&output=csv',
     respond: async (url) => {
       seen.push(url);
       call += 1;

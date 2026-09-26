@@ -1,0 +1,35 @@
+name: Deploy cafe menu to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Generate menu configuration
+        env:
+          MENU_CSV_URL: ${{ vars.MENU_CSV_URL }}
+        run: |
+          node -e 'require("fs").writeFileSync("site-config.js", "window.MENU_CSV_URL = " + JSON.stringify(process.env.MENU_CSV_URL || "") + ";\n")'
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+      - id: deployment
+        uses: actions/deploy-pages@v4

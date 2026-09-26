@@ -1,0 +1,1 @@
+window.MENU_CSV_URL = '';
