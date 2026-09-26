@@ -22,11 +22,26 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
-      - name: Generate menu configuration
+      - name: Point the menu at the published sheet
         env:
           MENU_CSV_URL: ${{ vars.MENU_CSV_URL }}
         run: |
-          node -e 'require("fs").writeFileSync("site-config.js", "window.MENU_CSV_URL = " + JSON.stringify(process.env.MENU_CSV_URL || "") + ";\n")'
+          node -e '
+            const fs = require("fs");
+            const url = process.env.MENU_CSV_URL;
+            if (!url) {
+              console.log("MENU_CSV_URL repo variable is not set, keeping the URL committed in site-config.js");
+              process.exit(0);
+            }
+            const file = "site-config.js";
+            const src = fs.readFileSync(file, "utf8");
+            const re = /window\.MENU_CSV_URL\s*=\s*[^;]*;/;
+            if (!re.test(src)) {
+              throw new Error("site-config.js has no window.MENU_CSV_URL line to update");
+            }
+            fs.writeFileSync(file, src.replace(re, "window.MENU_CSV_URL = " + JSON.stringify(url) + ";"));
+            console.log("site-config.js now reads the sheet from the repo variable");
+          '
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
