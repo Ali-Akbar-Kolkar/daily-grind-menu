@@ -11,14 +11,14 @@ A cafe menu webpage (hosted on GitHub Pages) that always shows the **latest menu
 - [x] Google Sheet created from the uploaded `menu.csv`
 - [x] Menu columns are `Category`, `Item Name`, `Description`, `Price`, `Available`, and `Tags`
 - [x] Sheet published to the web as CSV; the published feed is publicly readable
-- [ ] Confirm the published CSV feed remains enabled after future sheet changes
+- [x] Automatic republishing on sheet changes is enabled
 
 ### 2. GitHub setup
 - [x] Create public repository [`daily-grind-menu`](https://github.com/Ali-Akbar-Kolkar/daily-grind-menu)
-- [ ] Connect the local `poc` repository and push the `main` branch
-- [ ] Add repository variable `MENU_CSV_URL` under **Settings → Secrets and variables → Actions → Variables**
-- [ ] Set **Settings → Pages → Build and deployment → Source** to **GitHub Actions**
-- [ ] Push the `main` branch and verify the Pages deployment URL
+- [x] Connect the local `poc` repository and push the `main` branch
+- [x] Add repository variable `MENU_CSV_URL` under **Settings → Secrets and variables → Actions → Variables**
+- [x] Set **Settings → Pages → Build and deployment → Source** to **GitHub Actions**
+- [x] Verify the live deployment: [The Daily Grind menu](https://ali-akbar-kolkar.github.io/daily-grind-menu/)
 
 ### 3. Libraries (no backend/server needed)
 - [x] [PapaParse](https://www.papaparse.com/) — CSV parsing in-browser (via CDN, no install)
@@ -86,12 +86,10 @@ Completed
 - Updated the menu page to read `window.MENU_CSV_URL`. The local POC config now points to the published Drive feed; the imported local `menu.csv` has since been removed.
 - Added `site-config.js` and a GitHub Actions Pages workflow. During deployment, the workflow generates `site-config.js` from the `MENU_CSV_URL` repository variable.
 - Updated and ran `node smoke-test.js`; all checks pass, including the configured remote-feed retry behavior.
-- Created local commits `f5b5e81` and `a35383e`. The GitHub repository now exists; pushing the current branch is next.
+- Pushed commits `f5b5e81`, `a35383e`, and `16f941e` to the public GitHub repository.
+- Enabled Pages with GitHub Actions, configured the `MENU_CSV_URL` repository variable, and verified the deployed site renders 18 items from the published sheet: [The Daily Grind menu](https://ali-akbar-kolkar.github.io/daily-grind-menu/).
 
-Remaining Steps
-===============
+Ongoing
+======
 
-1. Connect the local repository to `daily-grind-menu` and push `main`.
-2. Add `MENU_CSV_URL` as a repository variable with the published CSV URL. This URL is public, so it does not need to be stored as a secret.
-3. Set the repository's Pages source to **GitHub Actions**. The workflow deploys on pushes to `main`.
-4. Open the Pages deployment URL and confirm the menu loads from the Google Sheet.
+Update the published Google Sheet to change menu data. Automatic republishing is enabled; changes can take a few minutes to appear on the site.
