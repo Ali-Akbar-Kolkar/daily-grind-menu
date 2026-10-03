@@ -196,9 +196,17 @@ function check(label, condition, detail) {
   check('cart clears after submission', cart.order.itemCount() === 0);
   check('pending order is stored for refresh', JSON.parse(cart.store.getItem('cafecart.v1')).order.id === payload.orderId);
   check('customer can start another order', cart.dom.orderAgain.hidden === false);
+  check('pending order remains reachable from the sticky bar',
+    cart.dom.cartBar.hidden === false && cart.dom.cartBarCount.textContent === 'Order pending');
   const pendingResume = await boot({ storage: cart.store });
   check('successful pending order restores in payment-pending state',
     pendingResume.order.phase() === 'awaiting-payment' && pendingResume.order.step() === 'pay');
+  check('pending order bar is visible after refresh', pendingResume.dom.cartBar.hidden === false);
+  pendingResume.dom.cartBar.listeners.click[0]();
+  check('sticky bar opens the pending-order drawer', pendingResume.dom.cart.hidden === false && pendingResume.order.step() === 'pay');
+  check('start-new-order action is accessible in the drawer', pendingResume.dom.orderAgain.hidden === false);
+  pendingResume.dom.orderAgain.listeners.click[0]();
+  check('starting a new order unlocks menu items', pendingResume.order.phase() === 'cart' && pendingResume.dom.cartBar.hidden === true);
   await cart.order.submitOrder({ preventDefault() {} });
   check('pending order is not submitted twice', cart.requests.length === 1);
 
@@ -271,6 +279,17 @@ function check(label, condition, detail) {
   check('page loads Apps Script transport and customer-name input', /src="submit-order\.js"/.test(HTML) && /id="orderName"/.test(HTML));
   check('backend validates IDs and totals', BACKEND.includes('ORDER_ID_PATTERN') && BACKEND.includes('Number(data.totalPaise) !== totalPaise'));
   check('backend throttles rapid repeat orders', BACKEND.includes('CacheService.getScriptCache') && BACKEND.includes('cache.put(cooldownKey, order.orderId, 15)'));
+  const backendContext = vm.createContext({ encodeURIComponent });
+  vm.runInContext(BACKEND, backendContext, { filename: 'payment-backend/Code.gs' });
+  const upiUrl = vm.runInContext("upiPaymentUrl_({ totalPaise: 575, orderId: 'ORD-TEST123' })", backendContext);
+  check('customer email UPI link includes amount and order reference',
+    /upi:\/\/pay\?.*am=5\.75.*cu=INR.*tn=ORD-TEST123.*tr=ORD-TEST123/.test(upiUrl));
+  const upiIntentUrl = vm.runInContext("upiIntentUrl_(upiPaymentUrl_({ totalPaise: 575, orderId: 'ORD-TEST123' }))", backendContext);
+  check('customer email button uses an Android UPI intent and has a standard-link fallback',
+    upiIntentUrl.startsWith('intent://pay?') && upiIntentUrl.endsWith('#Intent;scheme=upi;end') &&
+    BACKEND.includes('standard UPI link'));
+  check('customer order email includes a clickable UPI button',
+    BACKEND.includes('Pay with UPI</a>') && BACKEND.includes('htmlBody: htmlBody'));
   check('owner link requires a deliberate confirmation form', BACKEND.includes('value="confirmPaid"') && BACKEND.includes('Confirm payment received'));
 
   if (failures) {

@@ -211,15 +211,44 @@ function confirmPaid_(orderIdValue, tokenValue) {
 
 function sendCustomerOrderEmail_(order) {
   const subject = CONFIG.CAFE_NAME + ' — Order ' + order.orderId + ' received';
+  const paymentUrl = upiPaymentUrl_(order);
+  const paymentIntentUrl = upiIntentUrl_(paymentUrl);
   const body = 'Hi ' + order.customerName + ',\n\n' +
     'Thanks for your order from ' + CONFIG.CAFE_NAME + '!\n\n' +
     'Order ID: ' + order.orderId + '\n' +
     'Items: ' + order.itemsText + '\n' +
     'Total: ' + formatRupees_(order.totalPaise) + '\n\n' +
-    'To complete your order, pay by UPI to: ' + CONFIG.UPI_ID + '\n' +
+    'Pay with UPI: ' + paymentUrl + '\n' +
+    'If the link does not open, pay to UPI ID: ' + CONFIG.UPI_ID + '\n' +
     'Use ' + order.orderId + ' as the payment note/reference.\n\n' +
     'We will email you after the cafe verifies the payment.\n\n— ' + CONFIG.CAFE_NAME;
-  MailApp.sendEmail({ to: order.customerEmail, subject: subject, body: body, name: CONFIG.CAFE_NAME });
+  const htmlBody = '<div style="font-family:Arial,sans-serif;color:#33201a;max-width:560px">' +
+    '<p>Hi ' + escapeHtml_(order.customerName) + ',</p>' +
+    '<p>Thanks for your order from ' + escapeHtml_(CONFIG.CAFE_NAME) + '.</p>' +
+    '<p><strong>Order:</strong> ' + escapeHtml_(order.orderId) + '<br>' +
+    '<strong>Items:</strong> ' + escapeHtml_(order.itemsText) + '<br>' +
+    '<strong>Total:</strong> ' + escapeHtml_(formatRupees_(order.totalPaise)) + '</p>' +
+    '<p><a href="' + escapeHtml_(paymentIntentUrl) + '" style="display:inline-block;padding:12px 18px;background:#176b45;color:#fff;text-decoration:none;border-radius:6px;font-weight:bold">Pay with UPI</a></p>' +
+    '<p>If the button does not open a UPI app, try the <a href="' + escapeHtml_(paymentUrl) + '">standard UPI link</a>, or pay to <strong>' + escapeHtml_(CONFIG.UPI_ID) + '</strong> and use <strong>' + escapeHtml_(order.orderId) + '</strong> as the payment reference.</p>' +
+    '<p>The cafe will email you after verifying the payment.</p>' +
+    '<p>— ' + escapeHtml_(CONFIG.CAFE_NAME) + '</p></div>';
+  MailApp.sendEmail({ to: order.customerEmail, subject: subject, body: body, htmlBody: htmlBody, name: CONFIG.CAFE_NAME });
+}
+
+function upiPaymentUrl_(order) {
+  const params = [
+    'pa=' + encodeURIComponent(CONFIG.UPI_ID),
+    'pn=' + encodeURIComponent(CONFIG.CAFE_NAME),
+    'am=' + (order.totalPaise / 100).toFixed(2),
+    'cu=INR',
+    'tn=' + encodeURIComponent(order.orderId),
+    'tr=' + encodeURIComponent(order.orderId)
+  ];
+  return 'upi://pay?' + params.join('&');
+}
+
+function upiIntentUrl_(paymentUrl) {
+  return 'intent://' + String(paymentUrl).replace(/^upi:\/\//i, '') + '#Intent;scheme=upi;end';
 }
 
 function sendOwnerNotifyEmail_(order, token) {
