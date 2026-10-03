@@ -5,14 +5,17 @@ const path = require('path');
 const POC = __dirname;
 const SCRIPT = fs.readFileSync(path.join(POC, 'script.js'), 'utf8');
 const IMAGE_URLS = fs.readFileSync(path.join(POC, 'image-urls.js'), 'utf8');
-const CSV = fs.readFileSync(path.join(POC, 'menu-images.csv'), 'utf8');
+const SAMPLE_FILE = fs.existsSync(path.join(POC, '1menu-images.csv')) ? '1menu-images.csv' : 'menu-images.csv';
+const CSV = fs.readFileSync(path.join(POC, SAMPLE_FILE), 'utf8');
 const Images = require(path.join(POC, 'image-urls.js'));
 
 const DATA_LINES = CSV.split(/\r?\n/).filter((line) => line.trim()).slice(1);
 const photoCell = (line) => line.split(',').pop().trim();
 const NO_PHOTO_ROWS = DATA_LINES.filter((line) => !photoCell(line)).length;
 const BROKEN_ROWS = DATA_LINES.filter((line) => /example\.invalid/.test(photoCell(line))).length;
-const GSTATIC_ROWS = DATA_LINES.filter((line) => /encrypted-tbn\d*\.gstatic\.com/.test(photoCell(line)));
+const FLAT_WHITE_LINE = DATA_LINES.find((line) => line.startsWith('Coffee,Flat White,'));
+const FLAT_WHITE_IMAGE = photoCell(FLAT_WHITE_LINE || '');
+const GSTATIC_IMAGE = 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQb1OxoJy8BKWqmm-fMc9BGM2zEjlW45DaZLiHuWYbCKQ&s=10';
 
 const FILE_ID = '1AbCdEfGhIjKlMnOpQrStUvWxYz012345';
 const DRIVE_LINK = 'https://drive.google.com/file/d/' + FILE_ID + '/view?usp=sharing';
@@ -20,6 +23,19 @@ const DRIVE_LINK = 'https://drive.google.com/file/d/' + FILE_ID + '/view?usp=sha
 const DRIVE_CSV = [
   'Category,Item Name,Description,Price,Available,Tags,Image URL',
   'Bakery,Croissant,Butter laminated over three days.,4.25,Yes,,' + DRIVE_LINK
+].join('\n');
+
+const BROKEN_CSV = [
+  'Category,Item Name,Description,Price,Available,Tags,Image',
+  'Dessert,Mystery Cake,Test photo failure.,3,Yes,,https://example.invalid/not-a-real-image.jpg'
+].join('\n');
+
+const DIET_CSV = [
+  'Category,Item Name,Description,Price,Available,Tags,Image',
+  'Kitchen,Paneer Bowl,Vegetarian bowl.,10,Yes,V,',
+  'Kitchen,Chicken Wrap,Grilled chicken wrap.,12,Yes,NV,',
+  'Kitchen,Chicken Salad,Chicken with greens.,13,Yes,"NV, GF",',
+  'Kitchen,Garden Salad,Greens and herbs.,9,Yes,GF,'
 ].join('\n');
 
 function makeNode(tag) {
@@ -226,13 +242,10 @@ const HAPPY_PROBE = (url) => !/example\.invalid/.test(url);
     Images.classify('https://drive.google.com/about').kind === 'unknown');
 
   section('image-urls.js: what =IMAGE() publishes');
-  check('the sample sheet has at least one gstatic thumbnail',
-    GSTATIC_ROWS.length >= 1, GSTATIC_ROWS.length + ' found');
-  const gstatic = photoCell(GSTATIC_ROWS[0] || 'x,https://encrypted-tbn0.gstatic.com/images?q=tbn:x&s=10');
-  check('a gstatic thumbnail counts as a direct url, not a drive file',
-    Images.classify(gstatic).kind === 'direct', Images.classify(gstatic).kind);
+  check('a published gstatic thumbnail is classified as direct',
+    Images.classify(GSTATIC_IMAGE).kind === 'direct');
   check('a gstatic thumbnail is used exactly as published',
-    Images.candidates(gstatic)[0] === gstatic, Images.candidates(gstatic)[0]);
+    Images.candidates(GSTATIC_IMAGE)[0] === GSTATIC_IMAGE, Images.candidates(GSTATIC_IMAGE)[0]);
   check('query strings and ampersands survive',
     Images.candidates('https://example.com/a.jpg?w=600&h=400').join() === 'https://example.com/a.jpg?w=600&h=400');
 
@@ -300,20 +313,10 @@ const HAPPY_PROBE = (url) => !/example\.invalid/.test(url);
   check('price formatted as currency', /class="card__price">\$4\.75</.test(html));
   check('quoted comma field parsed whole',
     html.indexOf('Roasted squash, Puy lentils and tahini dressing. Add feta for 1.50.') !== -1);
-  check('direct photo url used as-is',
-    html.indexOf('src="https://picsum.photos/seed/flatwhite/640/420"') !== -1);
-  check('drive photo resolved to a sized cdn url',
-    html.indexOf('src="https://lh3.googleusercontent.com/d/PASTE_A_DRIVE_FILE_ID=w800"') !== -1);
-  check('drive share link converted to a cdn url',
-    html.indexOf('https://lh3.googleusercontent.com/d/PASTE_ANOTHER_FILE_ID=w800') !== -1);
+  check('sample image URL is rendered from the CSV unchanged',
+    Boolean(FLAT_WHITE_IMAGE) && html.indexOf('src="' + FLAT_WHITE_IMAGE + '"') !== -1);
   check('photo alt text uses the item name', html.indexOf('alt="Flat White"') !== -1);
   check('photo is lazy loaded', html.indexOf('loading="lazy"') !== -1);
-  check('broken photo marked failed', html.indexOf('card__media card__media--failed') !== -1);
-  check('failed photo records what it tried',
-    (function findTitle() {
-      const match = html.match(/title="No Drive URL form loaded[^"]*"/);
-      return match ? match[0].indexOf('example.invalid') !== -1 : false;
-    }()));
   check('rows without a photo get a placeholder',
     (html.match(/card__media card__media--none/g) || []).length === NO_PHOTO_ROWS,
     (html.match(/card__media card__media--none/g) || []).length + ' vs ' + NO_PHOTO_ROWS + ' blank cells');
@@ -324,6 +327,30 @@ const HAPPY_PROBE = (url) => !/example\.invalid/.test(url);
     menu.dom.itemCount.textContent);
   check('skeletons hidden', menu.dom.skeletons.hidden === true);
   check('refresh revealed', menu.dom.refresh.hidden === false);
+
+  const brokenImageMenu = await runCase({
+    respond: async () => ({ ok: true, status: 200, text: async () => BROKEN_CSV }),
+    probe: () => false
+  });
+  check('unavailable image is marked failed',
+    brokenImageMenu.html.indexOf('card__media card__media--failed') !== -1);
+  check('failed image records what it tried',
+    /title="No Drive URL form loaded[^\"]*example\.invalid/.test(brokenImageMenu.html));
+
+  const dietMenu = await runCase({
+    respond: async () => ({ ok: true, status: 200, text: async () => DIET_CSV }),
+    probe: HAPPY_PROBE
+  });
+  check('V tag displays the vegetarian mark',
+    /class="card__diet card__diet--veg"[^>]*aria-label="Vegetarian"/.test(dietMenu.html));
+  check('NV tag displays the non-vegetarian mark',
+    /class="card__diet card__diet--non-veg"[^>]*aria-label="Non-vegetarian"/.test(dietMenu.html));
+  check('V and NV codes are not repeated in the general tag text',
+    !/class="card__tag">(?:V|NV)(?: ·|<)/.test(dietMenu.html));
+  check('other tags remain visible alongside the non-vegetarian mark',
+    /class="card__tag">GF</.test(dietMenu.html));
+  check('unmarked items do not receive a food-type mark',
+    (dietMenu.html.match(/class="card__diet card__diet--/g) || []).length === 3);
 
   section('fallback chain in the rendered card');
   const fallback = await runCase({

@@ -146,6 +146,15 @@
       .filter(Boolean);
   }
 
+  function dietaryType(tags) {
+    for (let i = 0; i < tags.length; i += 1) {
+      const code = normalizeKey(tags[i]);
+      if (code === 'v') return 'veg';
+      if (code === 'nv') return 'non-veg';
+    }
+    return '';
+  }
+
   function buildItems(matrix) {
     const headerIndex = matrix.findIndex(isHeaderRow);
     if (headerIndex === -1) return [];
@@ -274,14 +283,34 @@
     }
     card.appendChild(head);
 
+    const diet = dietaryType(item.tags);
+    if (diet) {
+      const badge = el('span', 'card__diet card__diet--' + diet);
+      badge.setAttribute('role', 'img');
+      badge.setAttribute('aria-label', diet === 'veg' ? 'Vegetarian' : 'Non-vegetarian');
+
+      const mark = el('span', 'card__diet-mark');
+      mark.setAttribute('aria-hidden', 'true');
+      badge.appendChild(mark);
+
+      const label = el('span', 'card__diet-label');
+      label.textContent = diet === 'veg' ? 'Veg' : 'Non-veg';
+      badge.appendChild(label);
+      card.appendChild(badge);
+    }
+
     if (item.description) {
       const desc = el('p', 'card__desc');
       desc.textContent = item.description;
       card.appendChild(desc);
     }
-    if (item.tags.length) {
+    const otherTags = item.tags.filter((tag) => {
+      const code = normalizeKey(tag);
+      return code !== 'v' && code !== 'nv';
+    });
+    if (otherTags.length) {
       const tag = el('p', 'card__tag');
-      tag.textContent = item.tags.join(' \u00b7 ');
+      tag.textContent = otherTags.join(' \u00b7 ');
       card.appendChild(tag);
     }
     if (CafeOrder && item.price !== null) {
