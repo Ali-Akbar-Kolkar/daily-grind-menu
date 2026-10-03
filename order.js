@@ -555,7 +555,13 @@
   function renderBar() {
     if (!dom.cartBar) return;
     var count = itemCount();
-    dom.cartBar.hidden = count === 0;
+    var pendingOrder = phase === 'awaiting-payment' && order;
+    dom.cartBar.hidden = count === 0 && !pendingOrder;
+    if (pendingOrder) {
+      if (dom.cartBarCount) dom.cartBarCount.textContent = 'Order pending';
+      if (dom.cartBarTotal) dom.cartBarTotal.textContent = money(order.totalPaise);
+      return;
+    }
     if (dom.cartBarCount) dom.cartBarCount.textContent = count + (count === 1 ? ' item' : ' items');
     if (dom.cartBarTotal) dom.cartBarTotal.textContent = money(totalPaise());
   }
