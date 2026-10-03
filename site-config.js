@@ -6,27 +6,10 @@ window.MENU_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vToUFJhDl
 // Currency for the menu card prices. Must match CAFE_ORDER.currency below.
 window.MENU_CURRENCY = 'INR';
 
-// ---------------------------------------------------------------------------
-// Ordering. Every value below is a PLACEHOLDER until you fill it in.
-// Until the EmailJS ids are real, the cart works but "Send order" refuses to
-// send and says so. Add ?demo=1 to the URL to walk the whole flow locally
-// without sending anything. The cafe creates and emails payment QR codes
-// manually; this site does not store a UPI ID or generate a payment QR.
-// ---------------------------------------------------------------------------
+// Apps Script Web App URL. Deploy payment-backend/Code.gs as a Web App first.
+// Leave this placeholder until you have the deployment URL ending in /exec.
 window.CAFE_ORDER = {
-  emailjs: {
-    // emailjs.com -> Account -> API Keys  /  Email Services -> Service ID
-    serviceId: 'service_XXXXXXX',
-    // Email Templates -> your "New order" template id
-    orderTemplateId: 'template_XXXXXXX',
-    // Email Templates -> your "Payment claimed" owner-alert template id
-    paymentTemplateId: 'template_XXXXXXX',
-    // Account -> Public Key
-    publicKey: 'PUBLIC_KEY_XXXXXXX',
-    // Optional. Email Templates -> a receipt template whose To field is
-    // {{to_email}}, with the cafe on Cc. Leave '' to skip the customer copy.
-    receiptTemplateId: ''
-  },
+  appsScriptUrl: 'https://script.google.com/macros/s/AKfycbyo3eUSPxpfAof8c_dOKlZST3I2LK8wI9CwVA59zsZIBppQdjca_ZMuwV8RC43zBKV68w/exec',
 
   currency: 'INR',
   locale: 'en-IN',
@@ -35,9 +18,6 @@ window.CAFE_ORDER = {
   maxQtyPerLine: 20,
   maxLines: 30,
 
-  // Set false to skip the receipt copy to the customer
-  copyToCustomer: true,
-
-  // Force demo mode regardless of credentials
+  // Add ?demo=1 to the URL to test the order form without submitting.
   demoMode: false
 };

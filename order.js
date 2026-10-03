@@ -1,5 +1,5 @@
 /*
- * order.js - cart, EmailJS order email, manual payment wait, payment claim.
+ * order.js - cart, Apps Script order submission, manual UPI payment.
  *
  * Loaded before script.js and owns everything about ordering. script.js only
  * hands it the parsed menu items and asks it for an "Add" button per card, so
@@ -17,13 +17,7 @@
   var STORAGE_VERSION = 2;
 
   var DEFAULTS = {
-    emailjs: {
-      serviceId: '',
-      orderTemplateId: '',
-      paymentTemplateId: '',
-      receiptTemplateId: '',
-      publicKey: ''
-    },
+    appsScriptUrl: '',
     currency: 'INR',
     locale: 'en-IN',
     maxQtyPerLine: 20,
@@ -36,13 +30,6 @@
   /* ------------------------------------------------------------------ *
    * config
    * ------------------------------------------------------------------ */
-
-  /* Treats unfilled EmailJS placeholders as unset. */
-  function isReal(value) {
-    return typeof value === 'string' &&
-      value.length > 0 &&
-      !/X{3,}|YOUR[_-]?NAME|PLACEHOLDER/i.test(value);
-  }
 
   function merge(base, override) {
     var out = {};
@@ -59,33 +46,9 @@
 
   var config = merge(DEFAULTS, (typeof window !== 'undefined' && window.CAFE_ORDER) || {});
 
-  function emailReady() {
-    return isReal(config.emailjs.serviceId) &&
-      isReal(config.emailjs.orderTemplateId) &&
-      isReal(config.emailjs.publicKey);
-  }
-
-  function paymentReady() {
-    return emailReady() && isReal(config.emailjs.paymentTemplateId);
-  }
-
-  function receiptReady() {
-    return emailReady() && isReal(config.emailjs.receiptTemplateId);
-  }
-
-  /* Exactly which values are unset, naming the site-config.js key for each.
-
-     The customer only needs to be told ordering is off. The person actually
-    fixing it needs to be told WHICH line to edit. The detail goes to the
-    console, where the person debugging will find it, and stays off-screen. */
   function configProblem() {
-    var e = config.emailjs || {};
     var missing = [];
-    if (!isReal(e.serviceId)) missing.push('emailjs.serviceId');
-    if (!isReal(e.orderTemplateId)) missing.push('emailjs.orderTemplateId');
-    if (!isReal(e.paymentTemplateId)) missing.push('emailjs.paymentTemplateId');
-    if (!isReal(e.publicKey)) missing.push('emailjs.publicKey');
-    if (!sdkReady()) missing.push('the emailjs SDK script tag');
+    if (!backendReady()) missing.push('CAFE_ORDER.appsScriptUrl or submit-order.js');
     return missing;
   }
 
@@ -100,9 +63,11 @@
     }
   }
 
-  function sdkReady() {
-    return Boolean(typeof window !== 'undefined' && window.emailjs &&
-      typeof window.emailjs.send === 'function');
+  function backendReady() {
+    return Boolean(typeof window !== 'undefined' && window.CafeOrderBackend &&
+      typeof window.CafeOrderBackend.submit === 'function' &&
+      typeof window.CafeOrderBackend.configuredUrl === 'function' &&
+      window.CafeOrderBackend.configuredUrl());
   }
 
   function demoForced() {
@@ -118,7 +83,7 @@
   var demo = demoForced();
 
   function orderable() {
-    return demo || (paymentReady() && sdkReady());
+    return demo || backendReady();
   }
 
   /* ------------------------------------------------------------------ *
@@ -199,7 +164,7 @@
 
   function makeOrderId(now, salt) {
     var stamp = (now || Date.now()).toString(36).toUpperCase();
-    return 'ORD-' + stamp + '-' + (salt || randomChunk(4));
+    return 'ORD-' + stamp + '-' + (salt || randomChunk(8));
   }
 
   function lineText(line) {
@@ -214,50 +179,6 @@
       .join('\n');
   }
 
-  /*
-   * The order email must reach the owner, so its To field is a fixed address
-   * set in the EmailJS template. There is deliberately no to_email here: if the
-   * owner ever pointed the template at {{to_email}}, the order would be
-   * delivered to the customer instead of the cafe.
-   */
-  function orderEmailParams(order) {
-    var count = (order.lines || []).reduce(function (sum, line) { return sum + line.qty; }, 0);
-    return {
-      order_id: order.id,
-      customer_email: order.email,
-      reply_to: order.email,
-      order_lines: orderLinesText(order.lines),
-      order_count: String(count),
-      order_total: (order.totalPaise / 100).toFixed(2),
-      order_total_display: money(order.totalPaise),
-      currency: config.currency,
-      subject: 'New order ' + order.id + ' - ' + money(order.totalPaise),
-      placed_at: new Date(order.createdAt).toISOString()
-    };
-  }
-
-  /* owner alert: "a customer says they paid". To is fixed in the template. */
-  function paymentEmailParams(order, claimedAt) {
-    return {
-      order_id: order.id,
-      customer_email: order.email,
-      order_total: (order.totalPaise / 100).toFixed(2),
-      order_total_display: money(order.totalPaise),
-      currency: config.currency,
-      order_lines: orderLinesText(order.lines),
-      claimed_at: new Date(claimedAt).toISOString(),
-      subject: 'Payment Claimed - Order ' + order.id
-    };
-  }
-
-  /* customer receipt. This template's To field must be {{to_email}}. */
-  function receiptEmailParams(order, claimedAt) {
-    var params = paymentEmailParams(order, claimedAt);
-    params.to_email = order.email;
-    params.subject = 'Your order ' + order.id + ' - paid, being confirmed';
-    return params;
-  }
-
   /* ------------------------------------------------------------------ *
    * state
    * ------------------------------------------------------------------ */
@@ -265,9 +186,9 @@
   var IDS = [
     'menu', 'cartBar', 'cartBarCount', 'cartBarTotal', 'cart', 'cartClose',
     'stepCart', 'cartLines', 'cartEmpty', 'cartTotal', 'cartNotice', 'cartStart',
-    'cartClear', 'stepEmail', 'orderForm', 'orderEmail', 'orderWebsite',
+    'cartClear', 'stepEmail', 'orderForm', 'orderName', 'orderEmail', 'orderWebsite',
     'orderSubmit', 'orderStatus', 'stepPay', 'payTotal', 'payId',
-    'claimBtn', 'payStatus', 'orderAgain', 'cartLive'
+    'payStatus', 'orderAgain', 'cartLive'
   ];
 
   var dom = {};
@@ -298,8 +219,10 @@
       store.setItem(config.storageKey, JSON.stringify({
         v: STORAGE_VERSION,
         updated: Date.now(),
-        order: order && (phase === 'awaiting-payment' || phase === 'claiming') ? {
+        phase: phase,
+        order: order && (phase === 'sending' || phase === 'error' || phase === 'awaiting-payment') ? {
           id: order.id,
+          customerName: order.customerName,
           email: order.email,
           totalPaise: order.totalPaise,
           lines: order.lines,
@@ -363,7 +286,7 @@
 
     if (data.v === STORAGE_VERSION && isValidOrder(data.order)) {
       order = data.order;
-      phase = 'awaiting-payment';
+      phase = data.phase === 'awaiting-payment' ? 'awaiting-payment' : 'error';
     }
   }
 
@@ -371,6 +294,7 @@
     var createdAt = Number(saved && saved.createdAt);
     var declaredTotal = Number(saved && saved.totalPaise);
     if (!saved || typeof saved.id !== 'string' || !/^ORD-[A-Z0-9-]+$/.test(saved.id) ||
+      (saved.customerName != null && (typeof saved.customerName !== 'string' || saved.customerName.length > 100)) ||
         !isEmail(saved.email) || !Array.isArray(saved.lines) || !saved.lines.length ||
         saved.lines.length > config.maxLines || !isFinite(createdAt) || createdAt <= 0 ||
         !isFinite(declaredTotal) || declaredTotal < 0 || Math.floor(declaredTotal) !== declaredTotal) return false;
@@ -408,7 +332,7 @@
   }
 
   function orderLocked() {
-    return phase === 'sending' || phase === 'awaiting-payment' || phase === 'claiming';
+    return phase === 'sending' || phase === 'awaiting-payment';
   }
 
   function totalPaise() {
@@ -748,22 +672,22 @@
         : orderLocked() ? 'Order in progress' : 'Continue';
     }
 
-    var busy = phase === 'sending' || phase === 'claiming';
+    var busy = phase === 'sending';
 
     if (dom.orderSubmit) {
       dom.orderSubmit.disabled = busy;
       dom.orderSubmit.textContent = phase === 'sending' ? 'Sending\u2026' : 'Send order';
     }
+    if (dom.orderName) dom.orderName.disabled = busy;
     if (dom.orderEmail) dom.orderEmail.disabled = busy;
 
     if (dom.payTotal) dom.payTotal.textContent = order ? money(order.totalPaise) : money(totalPaise());
     if (dom.payId) dom.payId.textContent = order ? order.id : '';
 
-    if (dom.claimBtn) {
-      dom.claimBtn.disabled = phase !== 'awaiting-payment';
-      dom.claimBtn.textContent = phase === 'claiming' ? 'Sending\u2026' : "I've paid";
+    if (dom.orderAgain) {
+      dom.orderAgain.hidden = phase !== 'placed' && phase !== 'awaiting-payment';
+      dom.orderAgain.textContent = phase === 'awaiting-payment' ? 'Start a new order' : 'Order again';
     }
-    if (dom.orderAgain) dom.orderAgain.hidden = phase !== 'placed';
   }
 
   /* ------------------------------------------------------------------ *
@@ -824,21 +748,15 @@
    * order flow
    * ------------------------------------------------------------------ */
 
-  function friendlyError(err) {
-    var text = err && (err.text || err.message) ? String(err.text || err.message) : '';
-    if (/limit|quota|rate/i.test(text)) {
-      return 'The cafe cannot receive order emails right now. Please try again later or tell a staff member.';
-    }
-    if (/not found|template|service|invalid/i.test(text)) {
-      return 'The order email could not be sent. Please tell a staff member your order instead.';
-    }
-    return 'That did not send. Please try once more, or tell a staff member.';
+  function friendlyError() {
+    return 'The order request could not be sent. Your cart is safe; please try again or ask a staff member.';
   }
 
-  function snapshot() {
+  function snapshot(customerName, email) {
     return {
       id: makeOrderId(),
-      email: '',
+      customerName: customerName,
+      email: email,
       totalPaise: totalPaise(),
       lines: lines.map(function (line) {
         return {
@@ -853,9 +771,26 @@
     };
   }
 
-  async function sendWithEmailJs(templateId, params) {
-    if (typeof window.emailjs.init === 'function') window.emailjs.init(config.emailjs.publicKey);
-    return window.emailjs.send(config.emailjs.serviceId, templateId, params);
+  function sameOrderRequest(saved, candidate) {
+    if (!saved || saved.customerName !== candidate.customerName || saved.email !== candidate.email ||
+        saved.totalPaise !== candidate.totalPaise || saved.lines.length !== candidate.lines.length) return false;
+    return saved.lines.every(function (line, index) {
+      var next = candidate.lines[index];
+      return line.key === next.key && line.qty === next.qty && line.pricePaise === next.pricePaise;
+    });
+  }
+
+  function backendPayload(order, website) {
+    return {
+      orderId: order.id,
+      customerName: order.customerName,
+      customerEmail: order.email,
+      items: order.lines.map(function (line) {
+        return { name: line.name, qty: line.qty, pricePaise: line.pricePaise };
+      }),
+      totalPaise: order.totalPaise,
+      website: String(website || '')
+    };
   }
 
   function simulate() {
@@ -864,9 +799,9 @@
 
   async function submitOrder(event) {
     if (event && typeof event.preventDefault === 'function') event.preventDefault();
-    if (phase === 'sending' || phase === 'claiming') return;
+    if (phase === 'sending') return;
     if (phase === 'awaiting-payment') {
-      say(dom.payStatus, 'Your order is already sent. Complete payment before starting another order.', 'warn');
+      say(dom.payStatus, 'This order request was already sent. Check your email, or start a new order.', 'warn');
       return;
     }
 
@@ -879,6 +814,7 @@
       return;
     }
 
+    var customerName = String((dom.orderName && dom.orderName.value) || '').trim();
     var email = String((dom.orderEmail && dom.orderEmail.value) || '').trim();
 
     /* checked before the empty-cart case, so an item the cafe removed is not
@@ -897,6 +833,12 @@
       render();
       return;
     }
+    if (!customerName || customerName.length > 100) {
+      say(dom.orderStatus, 'Please enter your name (up to 100 characters).', 'warn');
+      render();
+      if (dom.orderName && typeof dom.orderName.focus === 'function') dom.orderName.focus();
+      return;
+    }
     if (!isEmail(email)) {
       say(dom.orderStatus, 'Please enter a valid email address, like name@example.com.', 'warn');
       render();
@@ -904,103 +846,54 @@
       return;
     }
 
-    if (!demo) {
-      if (!paymentReady() || !sdkReady()) {
-        sayNotConfigured();
-        return;
-      }
+    if (!demo && !backendReady()) {
+      sayNotConfigured();
+      return;
     }
+
+    var candidate = snapshot(customerName, email);
+    if (phase !== 'error' || !sameOrderRequest(order, candidate)) order = candidate;
 
     phase = 'sending';
     say(dom.orderStatus, 'Sending your order\u2026', null);
     render();
-
-    order = snapshot();
-    order.email = email;
-
     try {
+      var payload = backendPayload(order, dom.orderWebsite && dom.orderWebsite.value);
       if (demo) {
         await simulate();
-        console.info('[cafe demo] order email not sent', orderEmailParams(order));
+        console.info('[cafe demo] Apps Script request not sent', payload);
       } else {
-        await sendWithEmailJs(config.emailjs.orderTemplateId, orderEmailParams(order));
+        await window.CafeOrderBackend.submit(payload);
       }
     } catch (err) {
-      console.error('Order email failed:', err);
+      console.error('Order request failed:', err);
       phase = 'error';
-      say(dom.orderStatus, friendlyError(err), 'warn');
+      save();
+      say(dom.orderStatus, friendlyError(), 'warn');
       render();
       return;
     }
 
-    phase = 'awaiting-payment';
-    save();
+    phase = demo ? 'placed' : 'awaiting-payment';
+    lines = [];
+    notice = '';
+    if (demo) clearStorage();
+    else save();
     say(dom.orderStatus, '', null);
     showStep('pay');
     render();
-    say(dom.payStatus,
-      'Order sent! Please check your email. The cafe will reply with a payment QR code shortly.', 'ok');
-    announce('Order ' + order.id + ' sent. Check your email for a payment QR from the cafe.');
-  }
-
-  /* ------------------------------------------------------------------ *
-   * payment claim
-   * ------------------------------------------------------------------ */
-
-  async function claimPayment(event) {
-    if (event && typeof event.preventDefault === 'function') event.preventDefault();
-    if (phase !== 'awaiting-payment' || !order) return;
-
-    phase = 'claiming';
-    say(dom.payStatus, 'Sending your payment confirmation to the cafe\u2026', null);
-    render();
-
-    var claimedAt = Date.now();
-    order.claimedAt = claimedAt;
-
-    try {
-      if (demo) {
-        await simulate();
-        console.info('[cafe demo] payment email not sent', paymentEmailParams(order, claimedAt));
-        if (config.copyToCustomer && receiptReady()) {
-          console.info('[cafe demo] receipt not sent', receiptEmailParams(order, claimedAt));
-        }
-      } else {
-        if (!paymentReady()) throw new Error('payment template is not configured');
-        await sendWithEmailJs(config.emailjs.paymentTemplateId, paymentEmailParams(order, claimedAt));
-
-        /* the owner already has the alert, so a failed receipt is not fatal */
-        if (config.copyToCustomer && receiptReady()) {
-          try {
-            await sendWithEmailJs(config.emailjs.receiptTemplateId, receiptEmailParams(order, claimedAt));
-          } catch (err) {
-            console.warn('Receipt to customer failed:', err);
-          }
-        }
-      }
-    } catch (err) {
-      console.error('Payment email failed:', err);
-      phase = 'awaiting-payment';
-      say(dom.payStatus,
-        friendlyError(err) + ' Your cart is safe - press the button again once you have paid.', 'warn');
-      render();
-      return;
-    }
-
-    phase = 'placed';
-    lines = [];
-    notice = '';
-    clearStorage();
-    showStep('pay');
-    say(dom.payStatus,
-      'Thanks! Your payment notice was sent. The cafe will verify the payment before preparing your order.', 'ok');
-    render();
-    announce('Thanks. Order ' + order.id + ' is being confirmed by the cafe.');
+    say(dom.payStatus, demo
+      ? 'Demo only: no order was sent and no email was sent. Configure Apps Script before accepting payment.'
+      : 'Order request sent. Check your email for the order confirmation and UPI payment details before paying. Use the order ID as the payment reference.', 'ok');
+    announce(demo
+      ? 'Demo complete. No order was sent.'
+      : 'Order request ' + order.id + ' sent. Check your email for confirmation and UPI payment details.');
   }
 
   function startNewOrder() {
     resetOrder();
     clearStorage();
+    if (dom.orderName) dom.orderName.value = '';
     if (dom.orderEmail) dom.orderEmail.value = '';
     if (dom.orderWebsite) dom.orderWebsite.value = '';
     say(dom.payStatus, '', null);
@@ -1084,7 +977,6 @@
     }
     if (dom.cartClear) dom.cartClear.addEventListener('click', clearCart);
     if (dom.orderForm) dom.orderForm.addEventListener('submit', submitOrder);
-    if (dom.claimBtn) dom.claimBtn.addEventListener('click', claimPayment);
     if (dom.orderAgain) dom.orderAgain.addEventListener('click', startNewOrder);
     document.addEventListener('keydown', onKeyDown);
 
@@ -1095,7 +987,12 @@
     if (order && phase === 'awaiting-payment') {
       showStep('pay');
       say(dom.payStatus,
-        'Your order was sent. Check your email for the cafe\'s payment QR, then come back here to confirm payment.', 'ok');
+        'Your order request was sent. Check your email for the cafe\'s payment instructions. The cafe will email you after payment is verified.', 'ok');
+    } else if (order && phase === 'error') {
+      showStep('email');
+      if (dom.orderName) dom.orderName.value = order.customerName || '';
+      if (dom.orderEmail) dom.orderEmail.value = order.email;
+      say(dom.orderStatus, 'The last request may not have reached the cafe. Retry to use the same order ID, or start a new order.', 'warn');
     }
     render();
   }
@@ -1117,10 +1014,7 @@
     makeOrderId: makeOrderId,
     lineText: lineText,
     orderLinesText: orderLinesText,
-    orderEmailParams: orderEmailParams,
-    paymentEmailParams: paymentEmailParams,
-    receiptEmailParams: receiptEmailParams,
-    isReal: isReal,
+    backendPayload: backendPayload,
 
     /* state, for the test suite */
     lines: function () { return lines.slice(); },
@@ -1132,10 +1026,7 @@
     order: function () { return order; },
     config: config,
     demoMode: function () { return demo; },
-    emailReady: emailReady,
-    paymentReady: paymentReady,
-    receiptReady: receiptReady,
-    sdkReady: sdkReady,
+    backendReady: backendReady,
     orderable: orderable,
     storageAvailable: function () { return storageOk; },
 
@@ -1150,7 +1041,6 @@
     openCart: openCart,
     closeCart: closeCart,
     submitOrder: submitOrder,
-    claimPayment: claimPayment,
     startNewOrder: startNewOrder
   };
 
