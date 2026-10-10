@@ -54,7 +54,7 @@ The Pages site must then be deployed with the updated `site-config.js`. Until bo
 
 Opening the email link only displays the confirmation page; the separate button prevents mail-security link previews from marking an order paid automatically.
 
-All customer and owner emails include a linked Ali-Akbar-K logo that opens the developer portfolio. Email clients that block remote images will still show a clickable text portfolio link.
+All customer and owner emails include the Ali-Akbar-K logo as an inline email image, linked to the developer portfolio. The email also includes a clickable text portfolio link as a fallback.
 
 ## Email QR and external service
 

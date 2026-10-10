@@ -233,6 +233,12 @@ function sendCustomerOrderEmail_(order) {
       '<p><img src="' + escapeHtml_(qrImageUrl) + '" alt="UPI payment QR code" width="240" height="240" ' +
       'style="display:block;width:240px;height:240px;max-width:100%;height:auto"></p>';
   }
+  let developerLogo = null;
+  try {
+    developerLogo = developerLogoImage_();
+  } catch (error) {
+    console.error('Developer logo fetch failed for order ' + order.orderId + ': ' + error);
+  }
   const body = 'Hi ' + order.customerName + ',\n\n' +
     'Thanks for your order from ' + CONFIG.CAFE_NAME + '!\n\n' +
     'Order ID: ' + order.orderId + '\n' +
@@ -257,7 +263,7 @@ function sendCustomerOrderEmail_(order) {
     '<p>If the button does not open a UPI app, try the <a href="' + escapeHtml_(paymentUrl) + '">standard UPI link</a>, or pay to <strong>' + escapeHtml_(CONFIG.UPI_ID) + '</strong> and use <strong>' + escapeHtml_(order.orderId) + '</strong> as the payment reference.</p>' +
     '<p>The cafe will email you after verifying the payment.</p>' +
     '<p>— ' + escapeHtml_(CONFIG.CAFE_NAME) + '</p>' +
-    developerEmailFooterHtml_() + '</div>';
+    developerEmailFooterHtml_(Boolean(developerLogo)) + '</div>';
   const message = {
     to: order.customerEmail,
     subject: subject,
@@ -266,6 +272,10 @@ function sendCustomerOrderEmail_(order) {
     name: CONFIG.CAFE_NAME
   };
   if (paymentQr) message.inlineImages = { paymentQr: paymentQr };
+  if (developerLogo) {
+    message.inlineImages = message.inlineImages || {};
+    message.inlineImages.developerLogo = developerLogo;
+  }
   MailApp.sendEmail(message);
 }
 
@@ -368,6 +378,12 @@ function sendOwnerNotifyEmail_(order, token) {
     'Total: ' + formatRupees_(order.totalPaise) + '\n\n' +
     'After you verify payment in your banking app, open this link and confirm on the next page:\n' + markPaidUrl +
     developerEmailFooterText_();
+  let developerLogo = null;
+  try {
+    developerLogo = developerLogoImage_();
+  } catch (error) {
+    console.error('Developer logo fetch failed for owner notification ' + order.orderId + ': ' + error);
+  }
   const htmlBody = '<div style="font-family:Arial,sans-serif;color:#33201a;max-width:560px;line-height:1.5">' +
     '<h2 style="color:#176b45">New order received</h2>' +
     '<p>Payment is pending. Verify the payment in your banking app before confirming.</p>' +
@@ -383,14 +399,16 @@ function sendOwnerNotifyEmail_(order, token) {
     '<p>If the button does not work, copy this link into your browser:<br>' +
     '<a href="' + escapeHtml_(markPaidUrl) + '">' + escapeHtml_(markPaidUrl) + '</a></p>' +
     '<p>— ' + escapeHtml_(CONFIG.CAFE_NAME) + '</p>' +
-    developerEmailFooterHtml_() + '</div>';
-  MailApp.sendEmail({
+    developerEmailFooterHtml_(Boolean(developerLogo)) + '</div>';
+  const message = {
     to: CONFIG.OWNER_EMAIL,
     subject: subject,
     body: body,
     htmlBody: htmlBody,
     name: CONFIG.CAFE_NAME
-  });
+  };
+  if (developerLogo) message.inlineImages = { developerLogo: developerLogo };
+  MailApp.sendEmail(message);
 }
 
 function sendPaymentConfirmedEmail_(email, name, orderId) {
@@ -398,19 +416,27 @@ function sendPaymentConfirmedEmail_(email, name, orderId) {
   const body = 'Hi ' + name + ',\n\n' +
     'The cafe has confirmed payment for order ' + orderId + '. Your order is being prepared.\n\n— ' + CONFIG.CAFE_NAME +
     developerEmailFooterText_();
+  let developerLogo = null;
+  try {
+    developerLogo = developerLogoImage_();
+  } catch (error) {
+    console.error('Developer logo fetch failed for payment confirmation ' + orderId + ': ' + error);
+  }
   const htmlBody = '<div style="font-family:Arial,sans-serif;color:#33201a;max-width:560px">' +
     '<p>Hi ' + escapeHtml_(name) + ',</p>' +
     '<p>The cafe has confirmed payment for order <strong>' + escapeHtml_(orderId) +
     '</strong>. Your order is being prepared.</p>' +
     '<p>— ' + escapeHtml_(CONFIG.CAFE_NAME) + '</p>' +
-    developerEmailFooterHtml_() + '</div>';
-  MailApp.sendEmail({
+    developerEmailFooterHtml_(Boolean(developerLogo)) + '</div>';
+  const message = {
     to: email,
     subject: subject,
     body: body,
     htmlBody: htmlBody,
     name: CONFIG.CAFE_NAME
-  });
+  };
+  if (developerLogo) message.inlineImages = { developerLogo: developerLogo };
+  MailApp.sendEmail(message);
 }
 
 function getOrdersSheet_() {
@@ -467,12 +493,25 @@ function escapeHtml_(value) {
   });
 }
 
-function developerEmailFooterHtml_() {
+function developerLogoImage_() {
+  const response = UrlFetchApp.fetch(DEVELOPER_LOGO_URL, { muteHttpExceptions: true });
+  if (response.getResponseCode() !== 200) {
+    throw new Error('Logo image service returned HTTP ' + response.getResponseCode() + '.');
+  }
+  const image = response.getBlob();
+  if (String(image.getContentType() || '').indexOf('image/') !== 0) {
+    throw new Error('Portfolio logo URL did not return an image.');
+  }
+  return image.setName('developer-logo.png');
+}
+
+function developerEmailFooterHtml_(hasInlineLogo) {
+  const logoSource = hasInlineLogo ? 'cid:developerLogo' : DEVELOPER_LOGO_URL;
   return '<hr style="border:0;border-top:1px solid #eadfd9;margin:24px 0 16px">' +
     '<div style="font:13px Arial,sans-serif;color:#66554f;text-align:center">' +
     '<a href="' + escapeHtml_(DEVELOPER_PORTFOLIO_URL) + '" target="_blank" ' +
     'style="display:inline-block;text-decoration:none">' +
-    '<img src="' + escapeHtml_(DEVELOPER_LOGO_URL) + '" width="56" height="56" ' +
+    '<img src="' + escapeHtml_(logoSource) + '" width="72" height="72" ' +
     'alt="Ali-Akbar-K developer logo" style="display:block;width:56px;height:56px;' +
     'object-fit:contain;border:0;margin:0 auto 8px"></a>' +
     '<div>Designed &amp; developed by <a href="' + escapeHtml_(DEVELOPER_PORTFOLIO_URL) +
