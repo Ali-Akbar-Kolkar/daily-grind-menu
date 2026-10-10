@@ -335,6 +335,10 @@ function check(label, condition, detail) {
     sentEmails[0].body.includes('Scan the attached QR code') &&
     qrRequests[1].url.endsWith('data=' + encodeURIComponent(upiUrl)) &&
     qrRequests[1].options.muteHttpExceptions === true);
+  check('customer order email includes a linked developer logo and portfolio',
+    sentEmails[0].htmlBody.includes('href="https://ali-akbar-k.github.io/PORTFOLIO/"') &&
+    sentEmails[0].htmlBody.includes('src="https://ali-akbar-k.github.io/PORTFOLIO/images/Alifivacon.ico.png"') &&
+    sentEmails[0].body.includes('Portfolio: https://ali-akbar-k.github.io/PORTFOLIO/'));
   check('customer email button uses an HTTPS payment page and retains UPI fallback',
     paymentPageUrl.startsWith('https://') &&
     sentEmails[0].htmlBody.includes('href="' + escapedPaymentPageUrl + '"') &&
@@ -367,6 +371,18 @@ function check(label, condition, detail) {
     ownerEmail.htmlBody.includes('href="' + ownerConfirmationUrl.replace(/&/g, '&amp;') + '"') &&
     ownerEmail.body.includes('verify payment in your banking app') &&
     ownerEmail.body.includes(ownerConfirmationUrl));
+  check('owner notification includes the linked developer logo',
+    ownerEmail.htmlBody.includes('src="https://ali-akbar-k.github.io/PORTFOLIO/images/Alifivacon.ico.png"') &&
+    ownerEmail.body.includes('Portfolio: https://ali-akbar-k.github.io/PORTFOLIO/'));
+  vm.runInContext(
+    "sendPaymentConfirmedEmail_('customer@example.com', 'A Customer', 'ORD-TEST123')",
+    backendContext
+  );
+  const confirmationEmail = sentEmails[sentEmails.length - 1];
+  check('payment confirmation email includes the linked developer logo',
+    confirmationEmail.htmlBody.includes('href="https://ali-akbar-k.github.io/PORTFOLIO/"') &&
+    confirmationEmail.htmlBody.includes('src="https://ali-akbar-k.github.io/PORTFOLIO/images/Alifivacon.ico.png"') &&
+    confirmationEmail.body.includes('Portfolio: https://ali-akbar-k.github.io/PORTFOLIO/'));
   const gmailReturnPage = vm.runInContext(
     "gmailReturnResponse_('Payment confirmed for order ORD-TEST123.')",
     backendContext
