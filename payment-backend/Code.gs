@@ -60,7 +60,7 @@ function doGet(e) {
   const safeId = escapeHtml_(orderId);
   const form = '<main><h1>Confirm payment</h1><p>Only continue after verifying this payment in your bank app.</p>' +
     '<p>Order <strong>' + safeId + '</strong></p>' +
-    '<form method="post" action="' + escapeHtml_(CONFIG.WEB_APP_URL) + '">' +
+    '<form method="post" action="' + escapeHtml_(CONFIG.WEB_APP_URL) + '" target="_top">' +
     '<input type="hidden" name="action" value="confirmPaid">' +
     '<input type="hidden" name="orderId" value="' + safeId + '">' +
     '<input type="hidden" name="token" value="' + escapeHtml_(token) + '">' +
@@ -461,10 +461,12 @@ function gmailReturnResponse_(message) {
   return HtmlService.createHtmlOutput(
     '<!doctype html><html lang="en"><meta charset="utf-8">' +
     '<meta name="viewport" content="width=device-width,initial-scale=1">' +
+    '<meta http-equiv="refresh" content="3;url=https://mail.google.com/mail/u/0/#inbox">' +
     '<title>Payment status</title>' +
     '<body style="font:16px system-ui,sans-serif;max-width:36rem;margin:12vh auto;padding:1.5rem;color:#33201a">' +
     '<main style="text-align:center">' +
     '<h1 style="font-size:1.5rem">' + message + '</h1>' +
+    '<p>Returning to Gmail in a few seconds…</p>' +
     '<p><a target="_top" href="https://mail.google.com/mail/u/0/#inbox" ' +
     'style="display:inline-block;margin-top:1rem;padding:12px 20px;background:#176b45;color:#fff;' +
     'text-decoration:none;border-radius:6px;font-weight:bold">Back to Gmail</a></p>' +

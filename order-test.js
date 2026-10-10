@@ -363,7 +363,10 @@ function check(label, condition, detail) {
   check('payment result page has a top-level Back to Gmail button',
     gmailReturnPage.includes('>Back to Gmail</a>') &&
     gmailReturnPage.includes('target="_top" href="https://mail.google.com/mail/u/0/#inbox"') &&
+    gmailReturnPage.includes('http-equiv="refresh" content="3;url=https://mail.google.com/mail/u/0/#inbox"') &&
     gmailReturnPage.includes('Payment confirmed for order ORD-TEST123.'));
+  check('payment confirmation form submits at the top level',
+    BACKEND.includes('" target="_top">'));
   check('success and already-paid responses offer return to Gmail',
     BACKEND.includes("return gmailReturnResponse_('This order is already marked as paid.')") &&
     /return gmailReturnResponse_\('Payment confirmed for order '\s*\+\s*escapeHtml_\(orderId\)/.test(BACKEND));
