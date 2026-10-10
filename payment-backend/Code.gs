@@ -42,6 +42,8 @@ function doPost(e) {
 
 function doGet(e) {
   const params = (e && e.parameter) || {};
+  if (params.action === 'pay') return customerPaymentPage_(params.orderId);
+
   const orderId = String(params.orderId || '');
   const token = String(params.token || '');
   if (!ORDER_ID_PATTERN.test(orderId) || !token) return htmlResponse_('Invalid order confirmation link.');
@@ -212,13 +214,14 @@ function confirmPaid_(orderIdValue, tokenValue) {
 function sendCustomerOrderEmail_(order) {
   const subject = CONFIG.CAFE_NAME + ' — Order ' + order.orderId + ' received';
   const paymentUrl = upiPaymentUrl_(order);
-  const paymentIntentUrl = upiIntentUrl_(paymentUrl);
+  const paymentPageUrl = paymentPageUrl_(order.orderId);
   const body = 'Hi ' + order.customerName + ',\n\n' +
     'Thanks for your order from ' + CONFIG.CAFE_NAME + '!\n\n' +
     'Order ID: ' + order.orderId + '\n' +
     'Items: ' + order.itemsText + '\n' +
     'Total: ' + formatRupees_(order.totalPaise) + '\n\n' +
-    'Pay with UPI: ' + paymentUrl + '\n' +
+    'Pay with UPI: ' + paymentPageUrl + '\n' +
+    'Standard UPI link: ' + paymentUrl + '\n' +
     'If the link does not open, pay to UPI ID: ' + CONFIG.UPI_ID + '\n' +
     'Use ' + order.orderId + ' as the payment note/reference.\n\n' +
     'We will email you after the cafe verifies the payment.\n\n— ' + CONFIG.CAFE_NAME;
@@ -228,7 +231,7 @@ function sendCustomerOrderEmail_(order) {
     '<p><strong>Order:</strong> ' + escapeHtml_(order.orderId) + '<br>' +
     '<strong>Items:</strong> ' + escapeHtml_(order.itemsText) + '<br>' +
     '<strong>Total:</strong> ' + escapeHtml_(formatRupees_(order.totalPaise)) + '</p>' +
-    '<p><a href="' + escapeHtml_(paymentIntentUrl) + '" style="display:inline-block;padding:12px 18px;background:#176b45;color:#fff;text-decoration:none;border-radius:6px;font-weight:bold">Pay with UPI</a></p>' +
+    '<p><a href="' + escapeHtml_(paymentPageUrl) + '" style="display:inline-block;padding:12px 18px;background:#176b45;color:#fff;text-decoration:none;border-radius:6px;font-weight:bold">Pay with UPI</a></p>' +
     '<p>If the button does not open a UPI app, try the <a href="' + escapeHtml_(paymentUrl) + '">standard UPI link</a>, or pay to <strong>' + escapeHtml_(CONFIG.UPI_ID) + '</strong> and use <strong>' + escapeHtml_(order.orderId) + '</strong> as the payment reference.</p>' +
     '<p>The cafe will email you after verifying the payment.</p>' +
     '<p>— ' + escapeHtml_(CONFIG.CAFE_NAME) + '</p></div>';
@@ -247,8 +250,47 @@ function upiPaymentUrl_(order) {
   return 'upi://pay?' + params.join('&');
 }
 
-function upiIntentUrl_(paymentUrl) {
-  return 'intent://' + String(paymentUrl).replace(/^upi:\/\//i, '') + '#Intent;scheme=upi;end';
+function paymentPageUrl_(orderId) {
+  return CONFIG.WEB_APP_URL + '?action=pay&orderId=' + encodeURIComponent(orderId);
+}
+
+function customerPaymentPage_(orderIdValue) {
+  const orderId = String(orderIdValue || '');
+  if (!ORDER_ID_PATTERN.test(orderId)) return htmlResponse_('Invalid payment link.');
+
+  assertConfiguration_();
+  const sheet = getOrdersSheet_();
+  const rowIndex = findOrderRow_(sheet, orderId);
+  if (rowIndex < 0) return htmlResponse_('Order not found.');
+
+  const row = sheet.getRange(rowIndex, 1, 1, HEADERS.length).getValues()[0];
+  if (row[6] === 'Paid — Preparing') return htmlResponse_('This order is already marked as paid.');
+  if (row[6] !== 'Pending Payment' && row[6] !== 'Processing' && row[6] !== 'Email Failed') {
+    return htmlResponse_('This order is not ready for payment. Please contact the cafe.');
+  }
+
+  const totalPaise = Math.round(Number(row[5]) * 100);
+  if (!Number.isSafeInteger(totalPaise) || totalPaise < 1) {
+    return htmlResponse_('The order total is invalid. Please contact the cafe.');
+  }
+
+  const paymentUrl = upiPaymentUrl_({ orderId: orderId, totalPaise: totalPaise });
+  return HtmlService.createHtmlOutput(paymentPageHtml_(orderId, totalPaise, paymentUrl));
+}
+
+function paymentPageHtml_(orderId, totalPaise, paymentUrl) {
+  return '<!doctype html><html lang="en"><meta charset="utf-8">' +
+    '<meta name="viewport" content="width=device-width,initial-scale=1">' +
+    '<title>Pay with UPI</title>' +
+    '<body style="font:16px system-ui,sans-serif;max-width:34rem;margin:8vh auto;padding:1.5rem;color:#26352c">' +
+    '<main><h1>Complete your payment</h1>' +
+    '<p>Order <strong>' + escapeHtml_(orderId) + '</strong></p>' +
+    '<p>Amount: <strong>' + escapeHtml_(formatRupees_(totalPaise)) + '</strong></p>' +
+    '<p>UPI ID: <strong>' + escapeHtml_(CONFIG.UPI_ID) + '</strong></p>' +
+    '<p><a target="_top" href="' + escapeHtml_(paymentUrl) + '" style="display:inline-block;padding:14px 20px;background:#176b45;color:#fff;text-decoration:none;border-radius:6px;font-weight:bold">Open UPI app</a></p>' +
+    '<p>Review the payee, amount, and order reference in your UPI app before authorizing. Payment is not confirmed automatically.</p>' +
+    '<p><a target="_top" href="' + escapeHtml_(paymentUrl) + '">Try the UPI link again</a></p>' +
+    '</main></body></html>';
 }
 
 function sendOwnerNotifyEmail_(order, token) {

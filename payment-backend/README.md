@@ -47,8 +47,8 @@ The Pages site must then be deployed with the updated `site-config.js`. Until bo
 ## 5. What the customer and owner see
 
 1. The customer submits their name, email, and cart.
-2. Apps Script records the order and emails the customer the UPI ID, total, and order ID to use as the payment reference. It also emails the owner the order details.
-3. The customer pays directly in a UPI app. The menu page does not create a QR or process the payment.
+2. Apps Script records the order and emails the customer a **Pay with UPI** HTTPS button. It opens a payment page showing the stored amount and UPI ID; the page includes an **Open UPI app** button and manual details. The email also includes a standard `upi://pay` fallback.
+3. On a compatible Android phone, the customer taps **Pay with UPI** in Gmail, then taps **Open UPI app** on the payment page. The UPI app should open with the payee, amount, and order reference; the customer reviews and authorizes payment. The menu page does not create a QR or process the payment.
 4. After checking the bank app, the owner opens the email link and presses **Confirm payment received** on the confirmation page.
 5. Apps Script updates the Sheet and emails the customer that payment was confirmed.
 
@@ -56,7 +56,9 @@ Opening the email link only displays the confirmation page; the separate button 
 
 ## Browser response limitation
 
-The browser uses a `no-cors` POST because Apps Script does not expose a configurable CORS response header and redirects content responses to a one-time `googleusercontent.com` URL. The browser cannot read the Web App's JSON result. The checkout uses a stable order ID so retrying the same request does not create another order; the customer should wait for the order email before paying. If no email arrives, they should contact the cafe and provide the order ID rather than paying from an unconfirmed request.
+The browser uses a `no-cors` POST because Apps Script does not expose a configurable CORS response header and redirects content responses to a one-time `googleusercontent.com` URL. The browser cannot read the Web App's JSON result. The checkout uses a stable order ID so retrying the same request does not create another order; the customer should wait for the order email before paying. If no email arrives, they should contact the cafe and provide the order ID rather than paying from an unconfirmed request. The UPI button only opens and prefills a payment; the owner still verifies payment and confirms it through the owner link.
+
+After changing `doGet`, `sendCustomerOrderEmail_`, `upiPaymentUrl_`, `paymentPageUrl_`, or `customerPaymentPage_`, save Apps Script and deploy a **New version** for the payment page to work in new order emails. Previously sent emails do not change.
 
 ## Validation and limits
 

@@ -55,8 +55,8 @@ PapaParse is loaded from jsDelivr. There is no build step, npm install, or lockf
 
 1. The customer adds items, enters a name and email, and submits the cart.
 2. The browser posts the order to Apps Script using a stable order ID so a retry cannot create a duplicate row.
-3. Apps Script writes the order to the separate `Orders` sheet, emails the customer the UPI ID and payment reference, and emails the cafe an order notification.
-4. The customer pays directly in a UPI app. No payment gateway or QR generator is used by the site.
+3. Apps Script writes the order to the separate `Orders` sheet, emails the customer a **Pay with UPI** HTTPS button, and emails the cafe an order notification.
+4. The button opens a payment page showing the saved amount and UPI ID. On a compatible phone, the customer taps **Open UPI app**, reviews the details, and authorizes payment. No payment gateway or QR generator is used by the site.
 5. After checking the bank app, the owner opens the email link and presses **Confirm payment received**. Apps Script updates the order and emails the customer.
 
 There is no EmailJS integration. The Apps Script Web App URL is configured in `site-config.js`; the private Sheet ID, owner email, UPI ID, cafe name, and deployment URL are configured in Apps Script. Follow [the backend setup guide](payment-backend/README.md).
