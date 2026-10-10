@@ -276,6 +276,15 @@ function paymentQrImage_(paymentUrl) {
   return image.setName('payment-qr.png');
 }
 
+function authorizeQrImageService() {
+  const testPaymentUrl = upiPaymentUrl_({
+    orderId: 'ORD-QRTEST123',
+    totalPaise: 100
+  });
+  const image = paymentQrImage_(testPaymentUrl);
+  console.log('QR image service authorized; generated ' + image.getContentType() + '.');
+}
+
 function upiPaymentUrl_(order) {
   const params = [
     'pa=' + encodeURIComponent(CONFIG.UPI_ID),

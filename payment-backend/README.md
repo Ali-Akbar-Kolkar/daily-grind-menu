@@ -58,6 +58,8 @@ Opening the email link only displays the confirmation page; the separate button 
 
 The QR image is fetched from `api.qrserver.com` while Apps Script prepares the customer email. This sends the UPI ID, amount, and order reference to that QR-image service so it can encode the direct UPI payment link. Apps Script may ask for permission to make external requests the first time the updated code runs. If QR generation fails, the email reports that and still includes the UPI link and HTTPS payment-page button as fallbacks.
 
+After adding the QR code to an existing Apps Script project, run `authorizeQrImageService` once from the Apps Script editor and approve the external-request permission. This makes a harmless QR request using a test amount and order reference; it does not send an email or create an order. Then deploy a new version. If the project manifest lists OAuth scopes explicitly, include `https://www.googleapis.com/auth/script.external_request`.
+
 ## Browser response limitation
 
 The browser uses a `no-cors` POST because Apps Script does not expose a configurable CORS response header and redirects content responses to a one-time `googleusercontent.com` URL. The browser cannot read the Web App's JSON result. The checkout uses a stable order ID so retrying the same request does not create another order; the customer should wait for the order email before paying. If no email arrives, they should contact the cafe and provide the order ID rather than paying from an unconfirmed request. The UPI button only opens and prefills a payment; the owner still verifies payment and confirms it through the owner link.

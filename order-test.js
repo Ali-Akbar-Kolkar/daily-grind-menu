@@ -299,10 +299,18 @@ function check(label, condition, detail) {
         };
       }
     },
-    console: { error(message) { backendErrors.push(message); } },
+    console: {
+      error(message) { backendErrors.push(message); },
+      log(message) { backendErrors.push(message); }
+    },
     HtmlService: { createHtmlOutput(html) { return { html }; } }
   });
   vm.runInContext(BACKEND, backendContext, { filename: 'payment-backend/Code.gs' });
+  vm.runInContext('authorizeQrImageService()', backendContext);
+  check('QR authorization helper makes a harmless test request',
+    qrRequests.length === 1 &&
+    qrRequests[0].url.includes(encodeURIComponent('ORD-QRTEST123')) &&
+    backendErrors.some((message) => message.includes('QR image service authorized')));
   const upiUrl = vm.runInContext("upiPaymentUrl_({ totalPaise: 575, orderId: 'ORD-TEST123' })", backendContext);
   check('customer email UPI link includes amount and order reference',
     /upi:\/\/pay\?.*am=5\.75.*cu=INR.*tn=ORD-TEST123.*tr=ORD-TEST123/.test(upiUrl));
@@ -314,8 +322,8 @@ function check(label, condition, detail) {
     sentEmails[0].inlineImages.paymentQr === qrImage &&
     sentEmails[0].htmlBody.includes('src="cid:paymentQr"') &&
     sentEmails[0].body.includes('Scan the attached QR code') &&
-    qrRequests[0].url.endsWith('data=' + encodeURIComponent(upiUrl)) &&
-    qrRequests[0].options.muteHttpExceptions === true);
+    qrRequests[1].url.endsWith('data=' + encodeURIComponent(upiUrl)) &&
+    qrRequests[1].options.muteHttpExceptions === true);
   check('customer email button uses an HTTPS payment page and retains UPI fallback',
     paymentPageUrl.startsWith('https://') &&
     sentEmails[0].htmlBody.includes('href="' + escapedPaymentPageUrl + '"') &&
