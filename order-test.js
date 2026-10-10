@@ -153,7 +153,7 @@ async function boot(options = {}) {
   vm.runInContext(TRANSPORT, context, { filename: 'submit-order.js' });
   vm.runInContext(ORDER, context, { filename: 'order.js' });
   (document.listeners.DOMContentLoaded || []).forEach((listener) => listener());
-  return { order: sandbox.CafeOrder, dom: byId, requests, logs, store };
+  return { order: sandbox.CafeOrder, dom: byId, document, requests, logs, store };
 }
 function itemKey(order, itemName) {
   const item = MENU.find((entry) => entry.name === itemName);
@@ -172,6 +172,17 @@ function check(label, condition, detail) {
   check('email validation remains available', cart.order.isEmail('customer@example.com'));
   check('web app URL enables ordering', cart.order.orderable() === true);
   check('drawer is marked ready', cart.dom.cart.getAttribute('data-ready') === 'true');
+
+  const emptyCart = await boot();
+  emptyCart.order.setMenu(MENU);
+  emptyCart.order.openCart('cart');
+  check('empty cart offers an enabled continue-shopping action',
+    emptyCart.dom.cartStart.disabled === false &&
+    emptyCart.dom.cartStart.textContent === 'Continue shopping');
+  emptyCart.dom.cartStart.listeners.click[0]();
+  check('continue shopping closes empty cart and returns focus to menu',
+    emptyCart.dom.cart.hidden === true &&
+    emptyCart.document.activeElement === emptyCart.dom.menu);
 
   cart.order.setMenu(MENU);
   cart.order.add(itemKey(cart.order, 'Flat White'), 2);
