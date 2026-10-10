@@ -672,10 +672,13 @@
     }
 
     if (dom.cartStart) {
-      dom.cartStart.disabled = count === 0 || blocked || orderLocked();
-      dom.cartStart.textContent = blocked
+      dom.cartStart.disabled = (count > 0 && blocked) || orderLocked();
+      dom.cartStart.textContent = orderLocked()
+        ? 'Order in progress'
+        : count === 0 ? 'Continue shopping'
+        : blocked
         ? 'Remove unavailable items to continue'
-        : orderLocked() ? 'Order in progress' : 'Continue';
+        : 'Continue';
     }
 
     var busy = phase === 'sending';
@@ -977,6 +980,11 @@
     if (dom.cart) dom.cart.addEventListener('click', onCartClick);
     if (dom.cartStart) {
       dom.cartStart.addEventListener('click', function () {
+        if (!itemCount()) {
+          closeCart();
+          if (dom.menu && typeof dom.menu.focus === 'function') dom.menu.focus();
+          return;
+        }
         showStep('email');
         if (dom.orderEmail && typeof dom.orderEmail.focus === 'function') dom.orderEmail.focus();
       });
