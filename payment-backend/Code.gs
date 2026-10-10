@@ -292,6 +292,12 @@ function paymentPageUrl_(orderId) {
   return CONFIG.WEB_APP_URL + '?action=pay&orderId=' + encodeURIComponent(orderId);
 }
 
+function generateUpiQrUrl_(order) {
+  const paymentUrl = upiPaymentUrl_(order);
+  return 'https://api.qrserver.com/v1/create-qr-code/?size=480x480&format=png&data=' +
+    encodeURIComponent(paymentUrl);
+}
+
 function customerPaymentPage_(orderIdValue) {
   const orderId = String(orderIdValue || '');
   if (!ORDER_ID_PATTERN.test(orderId)) return htmlResponse_('Invalid payment link.');
@@ -317,6 +323,7 @@ function customerPaymentPage_(orderIdValue) {
 }
 
 function paymentPageHtml_(orderId, totalPaise, paymentUrl) {
+  const qrImageUrl = generateUpiQrUrl_({ orderId: orderId, totalPaise: totalPaise });
   return '<!doctype html><html lang="en"><meta charset="utf-8">' +
     '<meta name="viewport" content="width=device-width,initial-scale=1">' +
     '<title>Pay with UPI</title>' +
@@ -325,6 +332,9 @@ function paymentPageHtml_(orderId, totalPaise, paymentUrl) {
     '<p>Order <strong>' + escapeHtml_(orderId) + '</strong></p>' +
     '<p>Amount: <strong>' + escapeHtml_(formatRupees_(totalPaise)) + '</strong></p>' +
     '<p>UPI ID: <strong>' + escapeHtml_(CONFIG.UPI_ID) + '</strong></p>' +
+    '<p>Reference: <strong>' + escapeHtml_(orderId) + '</strong></p>' +
+    '<p><img src="' + escapeHtml_(qrImageUrl) + '" alt="UPI payment QR code" width="240" height="240" ' +
+    'style="display:block;width:240px;height:240px;max-width:100%;height:auto;margin:1rem auto"></p>' +
     '<p><a target="_top" href="' + escapeHtml_(paymentUrl) + '" style="display:inline-block;padding:14px 20px;background:#176b45;color:#fff;text-decoration:none;border-radius:6px;font-weight:bold">Open UPI app</a></p>' +
     '<p>Review the payee, amount, and order reference in your UPI app before authorizing. Payment is not confirmed automatically.</p>' +
     '<p><a target="_top" href="' + escapeHtml_(paymentUrl) + '">Try the UPI link again</a></p>' +
