@@ -1,0 +1,18 @@
+Category,Item Name,Description,Price,Available,Tags,Image
+Coffee,Espresso,A double shot of our house blend. Sweet and balanced.,4.5,No,V,https://images.unsplash.com/photo-1509042239860-f550ce710b93?auto=format&fit=crop&w=900&q=82
+Coffee,Flat White,Double ristretto with steamed milk and a thin layer of foam.,4.75,Yes,V,https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&w=900&q=82
+Coffee,Cortado,Equal parts espresso and warm milk. Small and serious.,4,Yes,V,https://images.unsplash.com/photo-1509042239860-f550ce710b93?auto=format&fit=crop&w=900&q=82
+Coffee,Filter of the Day,Rotating single origin brewed every twenty minutes.,4.25,Yes,V,https://images.unsplash.com/photo-1442512595331-e89e73853f31?auto=format&fit=crop&w=900&q=82
+Coffee,Cold Brew,Twelve hours in the fridge. Smooth and low acid.,5,Yes,V,https://images.unsplash.com/photo-1517701550927-30cf4ba1dba5?auto=format&fit=crop&w=900&q=82
+Coffee,Seasonal Mocha,Maple and sea salt espresso. Ask if it is still on.,5.75,No,V,https://images.unsplash.com/photo-1511920170033-f8396924c348?auto=format&fit=crop&w=900&q=82
+Tea & Infusions,Masala Chai,House masala steeped with black tea and steamed milk.,4.75,Yes,V,https://images.unsplash.com/photo-1571934811356-5cc061b6821f?auto=format&fit=crop&w=900&q=82
+Tea & Infusions,Sencha,Steamed Japanese green tea. Grassy and clean.,4,Yes,V,https://images.unsplash.com/photo-1544787219-7f47ccb76574?auto=format&fit=crop&w=900&q=82
+Tea & Infusions,Peppermint,"Loose leaf, naturally caffeine free.",3.5,Yes,"V, caffeine free",https://images.unsplash.com/photo-1515823064-d6e0c04616a7?auto=format&fit=crop&w=900&q=82
+Bakery,Croissant,Butter laminated over three days. Best before ten.,4.25,Yes,V,https://images.unsplash.com/photo-1555507036-ab1f4038808a?auto=format&fit=crop&w=900&q=82
+Bakery,Pain au Chocolat,"Baked with dark chocolate batons, 70% Valrhona.",4.75,Yes,V,https://images.unsplash.com/photo-1568254183919-78a4f43a2877?auto=format&fit=crop&w=900&q=82
+Bakery,Almond Danish,Almond frangipane with a citrus glaze.,5.25,Yes,V,https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=900&q=82
+Bakery,Olive Oil Focaccia,Sea salt and rosemary. Warm from the tray.,4,Yes,V,https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=900&q=82
+Kitchen,Avocado Toast,"Sourdough, smashed avocado, pickled shallot, chilli oil.",11.5,Yes,V,https://images.unsplash.com/photo-1525351484163-7529414344d8?auto=format&fit=crop&w=900&q=82
+Kitchen,Shakshuka,"Two baked eggs in a spiced tomato and pepper stew, with feta.",12,Yes,"NV, GF",https://images.unsplash.com/photo-1590412200988-a436970781fa?auto=format&fit=crop&w=900&q=82
+Kitchen,Grilled Cheese,Three cheeses and honey mustard on country loaf.,10.5,Yes,V,https://images.unsplash.com/photo-1528735602780-2552fd46c7af?auto=format&fit=crop&w=900&q=82
+Kitchen,Lentil Bowl,"Roasted squash, Puy lentils and tahini dressing. Add feta for 1.50.",13,Yes,"V, GF",https://images.unsplash.com/photo-1547592180-85f173990554?auto=format&fit=crop&w=900&q=82

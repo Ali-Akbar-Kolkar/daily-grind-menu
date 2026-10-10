@@ -279,17 +279,32 @@ function check(label, condition, detail) {
   check('page loads Apps Script transport and customer-name input', /src="submit-order\.js"/.test(HTML) && /id="orderName"/.test(HTML));
   check('backend validates IDs and totals', BACKEND.includes('ORDER_ID_PATTERN') && BACKEND.includes('Number(data.totalPaise) !== totalPaise'));
   check('backend throttles rapid repeat orders', BACKEND.includes('CacheService.getScriptCache') && BACKEND.includes('cache.put(cooldownKey, order.orderId, 15)'));
-  const backendContext = vm.createContext({ encodeURIComponent });
+  const sentEmails = [];
+  const backendContext = vm.createContext({
+    encodeURIComponent,
+    MailApp: { sendEmail(message) { sentEmails.push(message); } },
+    HtmlService: { createHtmlOutput(html) { return { html }; } }
+  });
   vm.runInContext(BACKEND, backendContext, { filename: 'payment-backend/Code.gs' });
   const upiUrl = vm.runInContext("upiPaymentUrl_({ totalPaise: 575, orderId: 'ORD-TEST123' })", backendContext);
   check('customer email UPI link includes amount and order reference',
     /upi:\/\/pay\?.*am=5\.75.*cu=INR.*tn=ORD-TEST123.*tr=ORD-TEST123/.test(upiUrl));
-  const upiIntentUrl = vm.runInContext("upiIntentUrl_(upiPaymentUrl_({ totalPaise: 575, orderId: 'ORD-TEST123' }))", backendContext);
-  check('customer email button uses an Android UPI intent and has a standard-link fallback',
-    upiIntentUrl.startsWith('intent://pay?') && upiIntentUrl.endsWith('#Intent;scheme=upi;end') &&
-    BACKEND.includes('standard UPI link'));
-  check('customer order email includes a clickable UPI button',
-    BACKEND.includes('Pay with UPI</a>') && BACKEND.includes('htmlBody: htmlBody'));
+  vm.runInContext("sendCustomerOrderEmail_({ orderId: 'ORD-TEST123', customerName: 'A Customer', customerEmail: 'customer@example.com', itemsText: 'Test item', totalPaise: 575 })", backendContext);
+  const paymentPageUrl = vm.runInContext("paymentPageUrl_('ORD-TEST123')", backendContext);
+  const escapedUpiUrl = upiUrl.replace(/&/g, '&amp;');
+  const escapedPaymentPageUrl = paymentPageUrl.replace(/&/g, '&amp;');
+  check('customer email button uses an HTTPS payment page and retains UPI fallback',
+    paymentPageUrl.startsWith('https://') &&
+    sentEmails[0].htmlBody.includes('href="' + escapedPaymentPageUrl + '"') &&
+    sentEmails[0].htmlBody.includes('href="' + escapedUpiUrl + '">standard UPI link</a>') &&
+    sentEmails[0].body.includes('Pay with UPI: ' + paymentPageUrl) &&
+    sentEmails[0].body.includes('Standard UPI link: ' + upiUrl));
+  const paymentPageHtml = vm.runInContext("paymentPageHtml_('ORD-TEST123', 575, upiPaymentUrl_({ totalPaise: 575, orderId: 'ORD-TEST123' }))", backendContext);
+  check('payment page gives the customer an explicit UPI app action',
+    paymentPageHtml.includes('Open UPI app') &&
+    paymentPageHtml.includes('target="_top" href="upi://pay?') &&
+    paymentPageHtml.includes('INR 5.75') &&
+    BACKEND.includes("params.action === 'pay'"));
   check('owner link requires a deliberate confirmation form', BACKEND.includes('value="confirmPaid"') && BACKEND.includes('Confirm payment received'));
 
   if (failures) {
