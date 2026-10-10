@@ -225,8 +225,11 @@ function sendCustomerOrderEmail_(order) {
       'style="display:block;width:240px;height:240px;max-width:100%;height:auto"></p>';
   } catch (error) {
     console.error('Payment QR generation failed for ' + order.orderId + ': ' + error);
-    qrFallback = 'The QR code could not be attached to this email. Use the UPI link below instead.\n';
-    qrMarkup = '<p><strong>The QR code could not be attached to this email. Use the UPI link below instead.</strong></p>';
+    qrFallback = 'The QR image is loaded directly in this email. If it is not visible, use the UPI link below.\n';
+    const qrImageUrl = generateUpiQrUrl_(order);
+    qrMarkup = '<p><strong>Scan this UPI QR code:</strong></p>' +
+      '<p><img src="' + escapeHtml_(qrImageUrl) + '" alt="UPI payment QR code" width="240" height="240" ' +
+      'style="display:block;width:240px;height:240px;max-width:100%;height:auto"></p>';
   }
   const body = 'Hi ' + order.customerName + ',\n\n' +
     'Thanks for your order from ' + CONFIG.CAFE_NAME + '!\n\n' +

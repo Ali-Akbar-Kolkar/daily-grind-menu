@@ -56,7 +56,7 @@ Opening the email link only displays the confirmation page; the separate button 
 
 ## Email QR and external service
 
-The QR image is fetched from `api.qrserver.com` while Apps Script prepares the customer email. This sends the UPI ID, amount, and order reference to that QR-image service so it can encode the direct UPI payment link. Apps Script may ask for permission to make external requests the first time the updated code runs. If QR generation fails, the email reports that and still includes the UPI link and HTTPS payment-page button as fallbacks.
+The QR image is fetched from `api.qrserver.com` while Apps Script prepares the customer email. This sends the UPI ID, amount, and order reference to that QR-image service so it can encode the direct UPI payment link. Apps Script may ask for permission to make external requests the first time the updated code runs. If fetching an inline image fails, the email embeds the QR service's image URL directly so Gmail can load it; the UPI link and HTTPS payment-page button remain fallbacks if the mail client blocks external images.
 
 After adding the QR code to an existing Apps Script project, run `authorizeQrImageService` once from the Apps Script editor and approve the external-request permission. This makes a harmless QR request using a test amount and order reference; it does not send an email or create an order. Then deploy a new version. If the project manifest lists OAuth scopes explicitly, include `https://www.googleapis.com/auth/script.external_request`.
 

@@ -334,7 +334,9 @@ function check(label, condition, detail) {
   vm.runInContext("sendCustomerOrderEmail_({ orderId: 'ORD-TEST456', customerName: 'A Customer', customerEmail: 'customer@example.com', itemsText: 'Test item', totalPaise: 575 })", backendContext);
   check('QR service failure is logged and email retains payment fallbacks',
     !sentEmails[1].inlineImages &&
-    sentEmails[1].body.includes('QR code could not be attached') &&
+    sentEmails[1].body.includes('QR image is loaded directly in this email') &&
+    sentEmails[1].htmlBody.includes('api.qrserver.com/v1/create-qr-code/') &&
+    sentEmails[1].htmlBody.includes('alt="UPI payment QR code"') &&
     sentEmails[1].htmlBody.includes('standard UPI link') &&
     backendErrors.some((message) => message.includes('Payment QR generation failed for ORD-TEST456')));
   const paymentPageHtml = vm.runInContext("paymentPageHtml_('ORD-TEST123', 575, upiPaymentUrl_({ totalPaise: 575, orderId: 'ORD-TEST123' }))", backendContext);
