@@ -362,8 +362,8 @@ function check(label, condition, detail) {
   ).html;
   check('payment result page has a top-level Back to Gmail button',
     gmailReturnPage.includes('>Back to Gmail</a>') &&
-    gmailReturnPage.includes('target="_top" href="https://mail.google.com/mail/u/0/#inbox"') &&
-    gmailReturnPage.includes('http-equiv="refresh" content="3;url=https://mail.google.com/mail/u/0/#inbox"') &&
+    gmailReturnPage.includes('target="_top" href="https://mail.google.com/mail/u/0/#sent"') &&
+    gmailReturnPage.includes('http-equiv="refresh" content="3;url=https://mail.google.com/mail/u/0/#sent"') &&
     gmailReturnPage.includes('Payment confirmed for order ORD-TEST123.'));
   check('payment confirmation form submits at the top level',
     BACKEND.includes('" target="_top">'));
