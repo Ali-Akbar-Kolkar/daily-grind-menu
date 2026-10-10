@@ -11,6 +11,8 @@ const CONFIG = {
   CAFE_NAME: 'The Daily Grind',
   WEB_APP_URL: 'https://script.google.com/macros/s/AKfycbyo3eUSPxpfAof8c_dOKlZST3I2LK8wI9CwVA59zsZIBppQdjca_ZMuwV8RC43zBKV68w/exec'
 };
+const DEVELOPER_PORTFOLIO_URL = 'https://ali-akbar-k.github.io/PORTFOLIO/';
+const DEVELOPER_LOGO_URL = 'https://ali-akbar-k.github.io/PORTFOLIO/images/Alifivacon.ico.png';
 
 const HEADERS = ['OrderID', 'Timestamp', 'CustomerName', 'CustomerEmail', 'Items', 'Total', 'Status', 'Token'];
 const ORDER_ID_PATTERN = /^ORD-[A-Z0-9-]{6,40}$/;
@@ -242,7 +244,8 @@ function sendCustomerOrderEmail_(order) {
     'Standard UPI link: ' + paymentUrl + '\n' +
     'If the link does not open, pay to UPI ID: ' + CONFIG.UPI_ID + '\n' +
     'Use ' + order.orderId + ' as the payment note/reference.\n\n' +
-    'We will email you after the cafe verifies the payment.\n\n— ' + CONFIG.CAFE_NAME;
+    'We will email you after the cafe verifies the payment.\n\n— ' + CONFIG.CAFE_NAME +
+    developerEmailFooterText_();
   const htmlBody = '<div style="font-family:Arial,sans-serif;color:#33201a;max-width:560px">' +
     '<p>Hi ' + escapeHtml_(order.customerName) + ',</p>' +
     '<p>Thanks for your order from ' + escapeHtml_(CONFIG.CAFE_NAME) + '.</p>' +
@@ -253,7 +256,8 @@ function sendCustomerOrderEmail_(order) {
     '<p><a href="' + escapeHtml_(paymentPageUrl) + '" style="display:inline-block;padding:12px 18px;background:#176b45;color:#fff;text-decoration:none;border-radius:6px;font-weight:bold">Pay with UPI</a></p>' +
     '<p>If the button does not open a UPI app, try the <a href="' + escapeHtml_(paymentUrl) + '">standard UPI link</a>, or pay to <strong>' + escapeHtml_(CONFIG.UPI_ID) + '</strong> and use <strong>' + escapeHtml_(order.orderId) + '</strong> as the payment reference.</p>' +
     '<p>The cafe will email you after verifying the payment.</p>' +
-    '<p>— ' + escapeHtml_(CONFIG.CAFE_NAME) + '</p></div>';
+    '<p>— ' + escapeHtml_(CONFIG.CAFE_NAME) + '</p>' +
+    developerEmailFooterHtml_() + '</div>';
   const message = {
     to: order.customerEmail,
     subject: subject,
@@ -362,7 +366,8 @@ function sendOwnerNotifyEmail_(order, token) {
     'Customer: ' + order.customerName + ' (' + order.customerEmail + ')\n' +
     'Items: ' + order.itemsText + '\n' +
     'Total: ' + formatRupees_(order.totalPaise) + '\n\n' +
-    'After you verify payment in your banking app, open this link and confirm on the next page:\n' + markPaidUrl;
+    'After you verify payment in your banking app, open this link and confirm on the next page:\n' + markPaidUrl +
+    developerEmailFooterText_();
   const htmlBody = '<div style="font-family:Arial,sans-serif;color:#33201a;max-width:560px;line-height:1.5">' +
     '<h2 style="color:#176b45">New order received</h2>' +
     '<p>Payment is pending. Verify the payment in your banking app before confirming.</p>' +
@@ -377,7 +382,8 @@ function sendOwnerNotifyEmail_(order, token) {
     '<p>This opens a confirmation page. Press its confirmation button only after verifying the payment.</p>' +
     '<p>If the button does not work, copy this link into your browser:<br>' +
     '<a href="' + escapeHtml_(markPaidUrl) + '">' + escapeHtml_(markPaidUrl) + '</a></p>' +
-    '<p>— ' + escapeHtml_(CONFIG.CAFE_NAME) + '</p></div>';
+    '<p>— ' + escapeHtml_(CONFIG.CAFE_NAME) + '</p>' +
+    developerEmailFooterHtml_() + '</div>';
   MailApp.sendEmail({
     to: CONFIG.OWNER_EMAIL,
     subject: subject,
@@ -390,8 +396,21 @@ function sendOwnerNotifyEmail_(order, token) {
 function sendPaymentConfirmedEmail_(email, name, orderId) {
   const subject = CONFIG.CAFE_NAME + ' — Payment confirmed for ' + orderId;
   const body = 'Hi ' + name + ',\n\n' +
-    'The cafe has confirmed payment for order ' + orderId + '. Your order is being prepared.\n\n— ' + CONFIG.CAFE_NAME;
-  MailApp.sendEmail({ to: email, subject: subject, body: body, name: CONFIG.CAFE_NAME });
+    'The cafe has confirmed payment for order ' + orderId + '. Your order is being prepared.\n\n— ' + CONFIG.CAFE_NAME +
+    developerEmailFooterText_();
+  const htmlBody = '<div style="font-family:Arial,sans-serif;color:#33201a;max-width:560px">' +
+    '<p>Hi ' + escapeHtml_(name) + ',</p>' +
+    '<p>The cafe has confirmed payment for order <strong>' + escapeHtml_(orderId) +
+    '</strong>. Your order is being prepared.</p>' +
+    '<p>— ' + escapeHtml_(CONFIG.CAFE_NAME) + '</p>' +
+    developerEmailFooterHtml_() + '</div>';
+  MailApp.sendEmail({
+    to: email,
+    subject: subject,
+    body: body,
+    htmlBody: htmlBody,
+    name: CONFIG.CAFE_NAME
+  });
 }
 
 function getOrdersSheet_() {
@@ -446,6 +465,23 @@ function escapeHtml_(value) {
   return String(value == null ? '' : value).replace(/[&<>"']/g, function (char) {
     return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char];
   });
+}
+
+function developerEmailFooterHtml_() {
+  return '<hr style="border:0;border-top:1px solid #eadfd9;margin:24px 0 16px">' +
+    '<div style="font:13px Arial,sans-serif;color:#66554f;text-align:center">' +
+    '<a href="' + escapeHtml_(DEVELOPER_PORTFOLIO_URL) + '" target="_blank" ' +
+    'style="display:inline-block;text-decoration:none">' +
+    '<img src="' + escapeHtml_(DEVELOPER_LOGO_URL) + '" width="56" height="56" ' +
+    'alt="Ali-Akbar-K developer logo" style="display:block;width:56px;height:56px;' +
+    'object-fit:contain;border:0;margin:0 auto 8px"></a>' +
+    '<div>Designed &amp; developed by <a href="' + escapeHtml_(DEVELOPER_PORTFOLIO_URL) +
+    '" target="_blank" style="color:#176b45;font-weight:bold">Ali-Akbar-K</a></div>' +
+    '</div>';
+}
+
+function developerEmailFooterText_() {
+  return '\n\nDesigned & developed by Ali-Akbar-K\nPortfolio: ' + DEVELOPER_PORTFOLIO_URL;
 }
 
 function jsonResponse_(value) {
