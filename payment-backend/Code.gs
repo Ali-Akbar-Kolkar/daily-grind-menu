@@ -215,11 +215,26 @@ function sendCustomerOrderEmail_(order) {
   const subject = CONFIG.CAFE_NAME + ' — Order ' + order.orderId + ' received';
   const paymentUrl = upiPaymentUrl_(order);
   const paymentPageUrl = paymentPageUrl_(order.orderId);
+  let paymentQr = null;
+  let qrMarkup = '';
+  let qrFallback = '';
+  try {
+    paymentQr = paymentQrImage_(paymentUrl);
+    qrMarkup = '<p><strong>Scan this QR code with your UPI app:</strong></p>' +
+      '<p><img src="cid:paymentQr" alt="UPI payment QR code" width="240" height="240" ' +
+      'style="display:block;width:240px;height:240px;max-width:100%;height:auto"></p>';
+  } catch (error) {
+    console.error('Payment QR generation failed for ' + order.orderId + ': ' + error);
+    qrFallback = 'The QR code could not be attached to this email. Use the UPI link below instead.\n';
+    qrMarkup = '<p><strong>The QR code could not be attached to this email. Use the UPI link below instead.</strong></p>';
+  }
   const body = 'Hi ' + order.customerName + ',\n\n' +
     'Thanks for your order from ' + CONFIG.CAFE_NAME + '!\n\n' +
     'Order ID: ' + order.orderId + '\n' +
     'Items: ' + order.itemsText + '\n' +
     'Total: ' + formatRupees_(order.totalPaise) + '\n\n' +
+    qrFallback +
+    'Scan the attached QR code with your UPI app, or use the direct UPI link below.\n\n' +
     'Pay with UPI: ' + paymentPageUrl + '\n' +
     'Standard UPI link: ' + paymentUrl + '\n' +
     'If the link does not open, pay to UPI ID: ' + CONFIG.UPI_ID + '\n' +
@@ -231,11 +246,34 @@ function sendCustomerOrderEmail_(order) {
     '<p><strong>Order:</strong> ' + escapeHtml_(order.orderId) + '<br>' +
     '<strong>Items:</strong> ' + escapeHtml_(order.itemsText) + '<br>' +
     '<strong>Total:</strong> ' + escapeHtml_(formatRupees_(order.totalPaise)) + '</p>' +
+    qrMarkup +
     '<p><a href="' + escapeHtml_(paymentPageUrl) + '" style="display:inline-block;padding:12px 18px;background:#176b45;color:#fff;text-decoration:none;border-radius:6px;font-weight:bold">Pay with UPI</a></p>' +
     '<p>If the button does not open a UPI app, try the <a href="' + escapeHtml_(paymentUrl) + '">standard UPI link</a>, or pay to <strong>' + escapeHtml_(CONFIG.UPI_ID) + '</strong> and use <strong>' + escapeHtml_(order.orderId) + '</strong> as the payment reference.</p>' +
     '<p>The cafe will email you after verifying the payment.</p>' +
     '<p>— ' + escapeHtml_(CONFIG.CAFE_NAME) + '</p></div>';
-  MailApp.sendEmail({ to: order.customerEmail, subject: subject, body: body, htmlBody: htmlBody, name: CONFIG.CAFE_NAME });
+  const message = {
+    to: order.customerEmail,
+    subject: subject,
+    body: body,
+    htmlBody: htmlBody,
+    name: CONFIG.CAFE_NAME
+  };
+  if (paymentQr) message.inlineImages = { paymentQr: paymentQr };
+  MailApp.sendEmail(message);
+}
+
+function paymentQrImage_(paymentUrl) {
+  const qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=480x480&format=png&data=' +
+    encodeURIComponent(paymentUrl);
+  const response = UrlFetchApp.fetch(qrUrl, { muteHttpExceptions: true });
+  if (response.getResponseCode() !== 200) {
+    throw new Error('QR image service returned HTTP ' + response.getResponseCode() + '.');
+  }
+  const image = response.getBlob();
+  if (String(image.getContentType() || '').indexOf('image/') !== 0) {
+    throw new Error('QR image service did not return an image.');
+  }
+  return image.setName('payment-qr.png');
 }
 
 function upiPaymentUrl_(order) {

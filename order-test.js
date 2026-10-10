@@ -280,9 +280,26 @@ function check(label, condition, detail) {
   check('backend validates IDs and totals', BACKEND.includes('ORDER_ID_PATTERN') && BACKEND.includes('Number(data.totalPaise) !== totalPaise'));
   check('backend throttles rapid repeat orders', BACKEND.includes('CacheService.getScriptCache') && BACKEND.includes('cache.put(cooldownKey, order.orderId, 15)'));
   const sentEmails = [];
+  const qrRequests = [];
+  const backendErrors = [];
+  let qrServiceFails = false;
+  const qrImage = {
+    getContentType() { return 'image/png'; },
+    setName(name) { this.name = name; return this; }
+  };
   const backendContext = vm.createContext({
     encodeURIComponent,
     MailApp: { sendEmail(message) { sentEmails.push(message); } },
+    UrlFetchApp: {
+      fetch(url, options) {
+        qrRequests.push({ url, options });
+        return {
+          getResponseCode() { return qrServiceFails ? 503 : 200; },
+          getBlob() { return qrImage; }
+        };
+      }
+    },
+    console: { error(message) { backendErrors.push(message); } },
     HtmlService: { createHtmlOutput(html) { return { html }; } }
   });
   vm.runInContext(BACKEND, backendContext, { filename: 'payment-backend/Code.gs' });
@@ -293,12 +310,25 @@ function check(label, condition, detail) {
   const paymentPageUrl = vm.runInContext("paymentPageUrl_('ORD-TEST123')", backendContext);
   const escapedUpiUrl = upiUrl.replace(/&/g, '&amp;');
   const escapedPaymentPageUrl = paymentPageUrl.replace(/&/g, '&amp;');
+  check('customer email embeds a QR for the direct UPI URL',
+    sentEmails[0].inlineImages.paymentQr === qrImage &&
+    sentEmails[0].htmlBody.includes('src="cid:paymentQr"') &&
+    sentEmails[0].body.includes('Scan the attached QR code') &&
+    qrRequests[0].url.endsWith('data=' + encodeURIComponent(upiUrl)) &&
+    qrRequests[0].options.muteHttpExceptions === true);
   check('customer email button uses an HTTPS payment page and retains UPI fallback',
     paymentPageUrl.startsWith('https://') &&
     sentEmails[0].htmlBody.includes('href="' + escapedPaymentPageUrl + '"') &&
     sentEmails[0].htmlBody.includes('href="' + escapedUpiUrl + '">standard UPI link</a>') &&
     sentEmails[0].body.includes('Pay with UPI: ' + paymentPageUrl) &&
     sentEmails[0].body.includes('Standard UPI link: ' + upiUrl));
+  qrServiceFails = true;
+  vm.runInContext("sendCustomerOrderEmail_({ orderId: 'ORD-TEST456', customerName: 'A Customer', customerEmail: 'customer@example.com', itemsText: 'Test item', totalPaise: 575 })", backendContext);
+  check('QR service failure is logged and email retains payment fallbacks',
+    !sentEmails[1].inlineImages &&
+    sentEmails[1].body.includes('QR code could not be attached') &&
+    sentEmails[1].htmlBody.includes('standard UPI link') &&
+    backendErrors.some((message) => message.includes('Payment QR generation failed for ORD-TEST456')));
   const paymentPageHtml = vm.runInContext("paymentPageHtml_('ORD-TEST123', 575, upiPaymentUrl_({ totalPaise: 575, orderId: 'ORD-TEST123' }))", backendContext);
   check('payment page gives the customer an explicit UPI app action',
     paymentPageHtml.includes('Open UPI app') &&
