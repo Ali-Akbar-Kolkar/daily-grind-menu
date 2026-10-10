@@ -347,6 +347,15 @@ function check(label, condition, detail) {
     paymentPageHtml.includes('alt="UPI payment QR code"') &&
     paymentPageHtml.includes('INR 5.75') &&
     BACKEND.includes("params.action === 'pay'"));
+  vm.runInContext("sendOwnerNotifyEmail_({ orderId: 'ORD-TEST123', customerName: 'A Customer', customerEmail: 'customer@example.com', itemsText: 'Test item', totalPaise: 575 }, 'token-123')", backendContext);
+  const ownerEmail = sentEmails[sentEmails.length - 1];
+  const ownerConfirmationUrl = vm.runInContext("CONFIG.WEB_APP_URL + '?orderId=ORD-TEST123&token=token-123'", backendContext);
+  check('owner email has a styled confirmation button and a plain-text fallback',
+    ownerEmail.to === 'PASTE_YOUR_EMAIL_HERE' &&
+    ownerEmail.htmlBody.includes('>Review and confirm payment</a>') &&
+    ownerEmail.htmlBody.includes('href="' + ownerConfirmationUrl.replace(/&/g, '&amp;') + '"') &&
+    ownerEmail.body.includes('verify payment in your banking app') &&
+    ownerEmail.body.includes(ownerConfirmationUrl));
   check('owner link requires a deliberate confirmation form', BACKEND.includes('value="confirmPaid"') && BACKEND.includes('Confirm payment received'));
 
   if (failures) {

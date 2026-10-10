@@ -362,8 +362,29 @@ function sendOwnerNotifyEmail_(order, token) {
     'Customer: ' + order.customerName + ' (' + order.customerEmail + ')\n' +
     'Items: ' + order.itemsText + '\n' +
     'Total: ' + formatRupees_(order.totalPaise) + '\n\n' +
-    'After you verify payment in your banking app, open this link and confirm:\n' + markPaidUrl;
-  MailApp.sendEmail({ to: CONFIG.OWNER_EMAIL, subject: subject, body: body, name: CONFIG.CAFE_NAME });
+    'After you verify payment in your banking app, open this link and confirm on the next page:\n' + markPaidUrl;
+  const htmlBody = '<div style="font-family:Arial,sans-serif;color:#33201a;max-width:560px;line-height:1.5">' +
+    '<h2 style="color:#176b45">New order received</h2>' +
+    '<p>Payment is pending. Verify the payment in your banking app before confirming.</p>' +
+    '<p><strong>Order:</strong> ' + escapeHtml_(order.orderId) + '<br>' +
+    '<strong>Customer:</strong> ' + escapeHtml_(order.customerName) + ' (' +
+    escapeHtml_(order.customerEmail) + ')<br>' +
+    '<strong>Items:</strong> ' + escapeHtml_(order.itemsText) + '<br>' +
+    '<strong>Total:</strong> ' + escapeHtml_(formatRupees_(order.totalPaise)) + '</p>' +
+    '<p><a href="' + escapeHtml_(markPaidUrl) + '" ' +
+    'style="display:inline-block;padding:13px 20px;background:#176b45;color:#fff;' +
+    'text-decoration:none;border-radius:6px;font-weight:bold">Review and confirm payment</a></p>' +
+    '<p>This opens a confirmation page. Press its confirmation button only after verifying the payment.</p>' +
+    '<p>If the button does not work, copy this link into your browser:<br>' +
+    '<a href="' + escapeHtml_(markPaidUrl) + '">' + escapeHtml_(markPaidUrl) + '</a></p>' +
+    '<p>— ' + escapeHtml_(CONFIG.CAFE_NAME) + '</p></div>';
+  MailApp.sendEmail({
+    to: CONFIG.OWNER_EMAIL,
+    subject: subject,
+    body: body,
+    htmlBody: htmlBody,
+    name: CONFIG.CAFE_NAME
+  });
 }
 
 function sendPaymentConfirmedEmail_(email, name, orderId) {
