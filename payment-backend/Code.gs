@@ -55,7 +55,7 @@ function doGet(e) {
 
   const row = sheet.getRange(rowIndex, 1, 1, HEADERS.length).getValues()[0];
   if (String(row[7]) !== token) return htmlResponse_('Invalid order confirmation link.');
-  if (row[6] === 'Paid — Preparing') return htmlResponse_('This order is already marked as paid.');
+  if (row[6] === 'Paid — Preparing') return gmailReturnResponse_('This order is already marked as paid.');
 
   const safeId = escapeHtml_(orderId);
   const form = '<main><h1>Confirm payment</h1><p>Only continue after verifying this payment in your bank app.</p>' +
@@ -187,7 +187,7 @@ function confirmPaid_(orderIdValue, tokenValue) {
 
     const row = sheet.getRange(rowIndex, 1, 1, HEADERS.length).getValues()[0];
     if (String(row[7]) !== token) return htmlResponse_('Invalid order confirmation link.');
-    if (row[6] === 'Paid — Preparing') return htmlResponse_('This order is already marked as paid.');
+    if (row[6] === 'Paid — Preparing') return gmailReturnResponse_('This order is already marked as paid.');
     if (row[6] === 'Confirming Payment') return htmlResponse_('Payment confirmation is already in progress.');
     if (row[6] !== 'Pending Payment' && row[6] !== 'Payment Email Failed') {
       return htmlResponse_('This order is not ready to be marked as paid.');
@@ -203,7 +203,7 @@ function confirmPaid_(orderIdValue, tokenValue) {
   try {
     sendPaymentConfirmedEmail_(customerEmail, customerName, orderId);
     sheet.getRange(rowIndex, 7).setValue('Paid — Preparing');
-    return htmlResponse_('Payment confirmed for order ' + escapeHtml_(orderId) + '. A confirmation email was sent to the customer.');
+    return gmailReturnResponse_('Payment confirmed for order ' + escapeHtml_(orderId) + '. A confirmation email was sent to the customer.');
   } catch (error) {
     console.error('Payment confirmation email failed for ' + orderId + ': ' + error);
     sheet.getRange(rowIndex, 7).setValue('Payment Email Failed');
@@ -455,6 +455,21 @@ function jsonResponse_(value) {
 function htmlResponse_(message) {
   return HtmlService.createHtmlOutput('<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Order status</title><body style="font:16px system-ui,sans-serif;max-width:36rem;margin:12vh auto;padding:1.5rem;color:#33201a">' +
     '<h1 style="font-size:1.5rem">' + message + '</h1></body></html>');
+}
+
+function gmailReturnResponse_(message) {
+  return HtmlService.createHtmlOutput(
+    '<!doctype html><html lang="en"><meta charset="utf-8">' +
+    '<meta name="viewport" content="width=device-width,initial-scale=1">' +
+    '<title>Payment status</title>' +
+    '<body style="font:16px system-ui,sans-serif;max-width:36rem;margin:12vh auto;padding:1.5rem;color:#33201a">' +
+    '<main style="text-align:center">' +
+    '<h1 style="font-size:1.5rem">' + message + '</h1>' +
+    '<p><a target="_top" href="https://mail.google.com/mail/u/0/#inbox" ' +
+    'style="display:inline-block;margin-top:1rem;padding:12px 20px;background:#176b45;color:#fff;' +
+    'text-decoration:none;border-radius:6px;font-weight:bold">Back to Gmail</a></p>' +
+    '</main></body></html>'
+  );
 }
 
 function safeError_(error) {

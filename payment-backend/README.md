@@ -49,7 +49,7 @@ The Pages site must then be deployed with the updated `site-config.js`. Until bo
 1. The customer submits their name, email, and cart.
 2. Apps Script records the order and emails the customer an inline QR code encoding the direct `upi://pay` link, a **Pay with UPI** HTTPS button, and a standard UPI-link fallback. Scanning the QR does not depend on opening the Apps Script payment-page URL.
 3. On a compatible phone, the customer scans the QR from another screen or taps **Pay with UPI** and then **Open UPI app**. The UPI app should open with the payee, amount, and order reference; the customer reviews and authorizes payment. The menu page does not process the payment.
-4. The cafe owner receives a **Review and confirm payment** button in the new-order email. After checking the bank app, the owner opens it and presses **Confirm payment received** on the confirmation page. The email also includes the plain link as a fallback.
+4. The cafe owner receives a **Review and confirm payment** button in the new-order email. After checking the bank app, the owner opens it and presses **Confirm payment received** on the confirmation page. The result page offers a **Back to Gmail** button, and the email also includes the plain link as a fallback.
 5. Apps Script updates the Sheet and emails the customer that payment was confirmed.
 
 Opening the email link only displays the confirmation page; the separate button prevents mail-security link previews from marking an order paid automatically.
