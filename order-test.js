@@ -333,6 +333,8 @@ function check(label, condition, detail) {
   check('payment page gives the customer an explicit UPI app action',
     paymentPageHtml.includes('Open UPI app') &&
     paymentPageHtml.includes('target="_top" href="upi://pay?') &&
+    paymentPageHtml.includes('api.qrserver.com/v1/create-qr-code/') &&
+    paymentPageHtml.includes('alt="UPI payment QR code"') &&
     paymentPageHtml.includes('INR 5.75') &&
     BACKEND.includes("params.action === 'pay'"));
   check('owner link requires a deliberate confirmation form', BACKEND.includes('value="confirmPaid"') && BACKEND.includes('Confirm payment received'));
