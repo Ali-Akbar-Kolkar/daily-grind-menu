@@ -102,6 +102,39 @@ code {
   color: var(--leaf);
 }
 
+.profile-edit { margin-top: .85rem; }
+
+.profile-dialog {
+  width: min(100% - 2rem, 27rem);
+  max-width: 27rem;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card);
+  color: var(--espresso);
+  box-shadow: 0 18px 60px rgba(51, 32, 26, .24);
+}
+
+.profile-dialog::backdrop { background: rgba(35, 25, 20, .54); }
+
+.profile-dialog__content { padding: 1.5rem; }
+
+.profile-dialog__content h2 {
+  margin: 0;
+  font-family: var(--serif);
+  font-size: 1.55rem;
+}
+
+.profile-dialog__lead { margin: .5rem 0 1.1rem; color: var(--coffee); }
+
+.profile-dialog__actions { display: grid; gap: .55rem; }
+
+.profile-dialog__fine {
+  margin: .9rem 0 0;
+  font-size: .78rem;
+  color: var(--muted);
+}
+
 /* ---------- test bench ---------- */
 
 .bench {

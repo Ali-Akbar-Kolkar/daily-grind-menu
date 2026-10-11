@@ -15,6 +15,7 @@
   'use strict';
 
   var STORAGE_VERSION = 2;
+  var PROFILE_STORAGE_KEY = 'cafecustomer.v1';
 
   var DEFAULTS = {
     appsScriptUrl: '',
@@ -188,7 +189,9 @@
     'stepCart', 'cartLines', 'cartEmpty', 'cartTotal', 'cartNotice', 'cartStart',
     'cartClear', 'stepEmail', 'orderForm', 'orderName', 'orderEmail', 'orderWebsite',
     'orderSubmit', 'orderStatus', 'stepPay', 'payTotal', 'payId',
-    'payStatus', 'orderAgain', 'cartLive'
+    'payStatus', 'orderAgain', 'cartLive', 'profileEdit', 'profileDialog',
+    'profileForm', 'profileName', 'profileEmail', 'profileStatus', 'profileSkip',
+    'profileForget'
   ];
 
   var dom = {};
@@ -201,6 +204,7 @@
   var step = 'cart';
   var storageOk = true;
   var lastFocus = null;
+  var customerProfile = null;
 
   function storage() {
     try {
@@ -321,6 +325,109 @@
     } catch (err) {
       storageOk = false;
     }
+  }
+
+  function loadCustomerProfile() {
+    var store = storage();
+    if (!store) return;
+    var raw;
+    try {
+      raw = store.getItem(PROFILE_STORAGE_KEY);
+    } catch (err) {
+      storageOk = false;
+      return;
+    }
+    if (!raw) return;
+
+    try {
+      var saved = JSON.parse(raw);
+      var name = String(saved && saved.name || '').trim();
+      var email = String(saved && saved.email || '').trim();
+      if (!name || name.length > 100 || !isEmail(email)) throw new Error('Invalid saved customer details.');
+      customerProfile = { name: name, email: email };
+    } catch (err) {
+      try {
+        store.removeItem(PROFILE_STORAGE_KEY);
+      } catch (removeError) {
+        storageOk = false;
+      }
+    }
+  }
+
+  function saveCustomerProfile(nameValue, emailValue) {
+    var name = String(nameValue || '').trim();
+    var email = String(emailValue || '').trim();
+    if (!name || name.length > 100 || !isEmail(email)) return false;
+    var store = storage();
+    if (!store) return false;
+    try {
+      store.setItem(PROFILE_STORAGE_KEY, JSON.stringify({ name: name, email: email }));
+      customerProfile = { name: name, email: email };
+      return true;
+    } catch (err) {
+      storageOk = false;
+      return false;
+    }
+  }
+
+  function fillCheckoutProfile() {
+    if (!customerProfile) return;
+    if (dom.orderName) dom.orderName.value = customerProfile.name;
+    if (dom.orderEmail) dom.orderEmail.value = customerProfile.email;
+  }
+
+  function openProfileDialog() {
+    if (!dom.profileDialog || typeof dom.profileDialog.showModal !== 'function') return;
+    if (dom.profileName) dom.profileName.value = customerProfile ? customerProfile.name : '';
+    if (dom.profileEmail) dom.profileEmail.value = customerProfile ? customerProfile.email : '';
+    if (dom.profileForget) dom.profileForget.hidden = !customerProfile;
+    if (dom.profileSkip) dom.profileSkip.textContent = customerProfile ? 'Cancel' : 'Continue without saving';
+    say(dom.profileStatus, '', null);
+    dom.profileDialog.showModal();
+    if (dom.profileName && typeof dom.profileName.focus === 'function') dom.profileName.focus();
+  }
+
+  function submitCustomerProfile(event) {
+    if (event && typeof event.preventDefault === 'function') event.preventDefault();
+    var name = String((dom.profileName && dom.profileName.value) || '').trim();
+    var email = String((dom.profileEmail && dom.profileEmail.value) || '').trim();
+    if (!name || name.length > 100) {
+      say(dom.profileStatus, 'Enter your name (up to 100 characters).', 'warn');
+      if (dom.profileName) dom.profileName.focus();
+      return;
+    }
+    if (!isEmail(email)) {
+      say(dom.profileStatus, 'Enter a valid email address.', 'warn');
+      if (dom.profileEmail) dom.profileEmail.focus();
+      return;
+    }
+    if (!saveCustomerProfile(name, email)) {
+      say(dom.profileStatus, 'These details could not be saved in this browser. You can continue without saving and enter them at checkout.', 'warn');
+      return;
+    }
+    fillCheckoutProfile();
+    if (dom.profileEdit) dom.profileEdit.textContent = 'Edit my details';
+    if (dom.profileDialog) dom.profileDialog.close();
+  }
+
+  function forgetCustomerProfile() {
+    var store = storage();
+    if (!store) {
+      say(dom.profileStatus, 'Saved details could not be removed from this browser.', 'warn');
+      return;
+    }
+    try {
+      store.removeItem(PROFILE_STORAGE_KEY);
+    } catch (err) {
+      storageOk = false;
+      say(dom.profileStatus, 'Saved details could not be removed from this browser.', 'warn');
+      return;
+    }
+    customerProfile = null;
+    if (dom.orderName) dom.orderName.value = order ? order.customerName || '' : '';
+    if (dom.orderEmail) dom.orderEmail.value = order ? order.email : '';
+    if (dom.profileEdit) dom.profileEdit.textContent = 'Save my details';
+    if (dom.profileDialog) dom.profileDialog.close();
   }
 
   /* ------------------------------------------------------------------ *
@@ -902,8 +1009,8 @@
   function startNewOrder() {
     resetOrder();
     clearStorage();
-    if (dom.orderName) dom.orderName.value = '';
-    if (dom.orderEmail) dom.orderEmail.value = '';
+    if (dom.orderName) dom.orderName.value = customerProfile ? customerProfile.name : '';
+    if (dom.orderEmail) dom.orderEmail.value = customerProfile ? customerProfile.email : '';
     if (dom.orderWebsite) dom.orderWebsite.value = '';
     say(dom.payStatus, '', null);
     say(dom.orderStatus, '', null);
@@ -992,11 +1099,22 @@
     if (dom.cartClear) dom.cartClear.addEventListener('click', clearCart);
     if (dom.orderForm) dom.orderForm.addEventListener('submit', submitOrder);
     if (dom.orderAgain) dom.orderAgain.addEventListener('click', startNewOrder);
+    if (dom.profileEdit) dom.profileEdit.addEventListener('click', openProfileDialog);
+    if (dom.profileForm) dom.profileForm.addEventListener('submit', submitCustomerProfile);
+    if (dom.profileSkip) {
+      dom.profileSkip.addEventListener('click', function () {
+        if (dom.profileDialog) dom.profileDialog.close();
+      });
+    }
+    if (dom.profileForget) dom.profileForget.addEventListener('click', forgetCustomerProfile);
     document.addEventListener('keydown', onKeyDown);
 
     /* the drawer tells the stylesheet and the tests whether ordering is live */
     dom.cart.setAttribute('data-ready', orderable() ? 'true' : 'false');
 
+    loadCustomerProfile();
+    fillCheckoutProfile();
+    if (customerProfile && dom.profileEdit) dom.profileEdit.textContent = 'Edit my details';
     load();
     if (order && phase === 'awaiting-payment') {
       showStep('pay');
@@ -1009,6 +1127,9 @@
       say(dom.orderStatus, 'The last request may not have reached the cafe. Retry to use the same order ID, or start a new order.', 'warn');
     }
     render();
+    if (!customerProfile && !order && dom.profileDialog && typeof dom.profileDialog.showModal === 'function') {
+      openProfileDialog();
+    }
   }
 
   /* ------------------------------------------------------------------ *
@@ -1055,7 +1176,9 @@
     openCart: openCart,
     closeCart: closeCart,
     submitOrder: submitOrder,
-    startNewOrder: startNewOrder
+    startNewOrder: startNewOrder,
+    saveCustomerProfile: saveCustomerProfile,
+    customerProfile: function () { return customerProfile; }
   };
 
   if (typeof window !== 'undefined') {

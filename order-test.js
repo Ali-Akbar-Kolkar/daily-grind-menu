@@ -11,7 +11,9 @@ const IDS = [
   'menu', 'cartBar', 'cartBarCount', 'cartBarTotal', 'cart', 'cartClose', 'stepCart',
   'cartLines', 'cartEmpty', 'cartTotal', 'cartNotice', 'cartStart', 'cartClear',
   'stepEmail', 'orderForm', 'orderName', 'orderEmail', 'orderWebsite', 'orderSubmit',
-  'orderStatus', 'stepPay', 'payTotal', 'payId', 'payStatus', 'orderAgain', 'cartLive'
+  'orderStatus', 'stepPay', 'payTotal', 'payId', 'payStatus', 'orderAgain', 'cartLive',
+  'profileEdit', 'profileDialog', 'profileForm', 'profileName', 'profileEmail',
+  'profileStatus', 'profileSkip', 'profileForget'
 ];
 const CONFIG = {
   appsScriptUrl: 'https://script.google.com/macros/s/test-deployment/exec',
@@ -75,6 +77,8 @@ function buildDom() {
     node.hasAttribute = (name) => node.attrs[name] !== undefined;
     node.addEventListener = (type, listener) => { (node.listeners[type] = node.listeners[type] || []).push(listener); };
     node.focus = () => { document.activeElement = node; };
+    node.showModal = () => { node.open = true; };
+    node.close = () => { node.open = false; };
     node.closest = (selector) => {
       let current = node;
       while (current) {
@@ -104,6 +108,7 @@ function buildDom() {
   byId.stepPay.hidden = true;
   byId.cartLive.setAttribute('role', 'status');
   byId.cartLive.setAttribute('aria-live', 'polite');
+  byId.profileDialog.open = false;
   byId.orderStatus.setAttribute('role', 'status');
   byId.payStatus.setAttribute('role', 'status');
   [
@@ -112,6 +117,7 @@ function buildDom() {
     ['stepPay', ['payTotal', 'payId', 'payStatus', 'orderAgain']]
   ].forEach(([parent, children]) => children.forEach((id) => byId[parent].appendChild(byId[id])));
   ['orderName', 'orderEmail', 'orderWebsite', 'orderSubmit'].forEach((id) => byId.orderForm.appendChild(byId[id]));
+  ['profileName', 'profileEmail', 'profileStatus', 'profileSkip', 'profileForget'].forEach((id) => byId.profileForm.appendChild(byId[id]));
   ['stepCart', 'stepEmail', 'stepPay'].forEach((id) => byId.cart.appendChild(byId[id]));
   return { document, byId };
 }
@@ -183,6 +189,61 @@ function check(label, condition, detail) {
   check('continue shopping closes empty cart and returns focus to menu',
     emptyCart.dom.cart.hidden === true &&
     emptyCart.document.activeElement === emptyCart.dom.menu);
+
+  const firstVisit = await boot();
+  check('first visit asks whether to save name and email', firstVisit.dom.profileDialog.open === true);
+  firstVisit.dom.profileName.value = 'A Customer';
+  firstVisit.dom.profileEmail.value = 'customer@example.com';
+  firstVisit.dom.profileForm.listeners.submit[0]({ preventDefault() {} });
+  check('valid details are saved under a separate customer-profile key',
+    JSON.parse(firstVisit.store.getItem('cafecustomer.v1')).name === 'A Customer' &&
+    firstVisit.store.getItem('cafecart.v1') === null);
+  check('saving details prefills checkout and closes the prompt',
+    firstVisit.dom.orderName.value === 'A Customer' &&
+    firstVisit.dom.orderEmail.value === 'customer@example.com' &&
+    firstVisit.dom.profileDialog.open === false);
+  check('saved profile offers an edit action', firstVisit.dom.profileEdit.textContent === 'Edit my details');
+  firstVisit.order.startNewOrder();
+  check('starting a new order keeps the saved details and profile storage',
+    firstVisit.dom.orderName.value === 'A Customer' &&
+    firstVisit.dom.orderEmail.value === 'customer@example.com' &&
+    firstVisit.store.getItem('cafecustomer.v1') !== null);
+  const returningVisit = await boot({ storage: firstVisit.store });
+  check('saved details are restored on a later visit without prompting',
+    returningVisit.dom.orderName.value === 'A Customer' &&
+    returningVisit.dom.orderEmail.value === 'customer@example.com' &&
+    returningVisit.dom.profileDialog.open === false);
+  returningVisit.dom.profileEdit.listeners.click[0]();
+  returningVisit.dom.profileName.value = 'Updated Customer';
+  returningVisit.dom.profileEmail.value = 'updated@example.com';
+  returningVisit.dom.profileForm.listeners.submit[0]({ preventDefault() {} });
+  check('edited details replace the saved profile and checkout values',
+    JSON.parse(firstVisit.store.getItem('cafecustomer.v1')).name === 'Updated Customer' &&
+    returningVisit.dom.orderEmail.value === 'updated@example.com');
+  returningVisit.dom.profileEdit.listeners.click[0]();
+  returningVisit.dom.profileName.value = 'Bad Update';
+  returningVisit.dom.profileEmail.value = 'invalid';
+  returningVisit.dom.profileForm.listeners.submit[0]({ preventDefault() {} });
+  check('invalid email does not overwrite a valid saved profile',
+    JSON.parse(firstVisit.store.getItem('cafecustomer.v1')).name === 'Updated Customer' &&
+    returningVisit.dom.profileDialog.open === true);
+  returningVisit.dom.profileForget.listeners.click[0]();
+  check('forget details removes only the profile and clears checkout fields',
+    firstVisit.store.getItem('cafecustomer.v1') === null &&
+    returningVisit.dom.orderName.value === '' &&
+    returningVisit.dom.orderEmail.value === '');
+
+  const invalidProfile = await boot();
+  invalidProfile.dom.profileName.value = '';
+  invalidProfile.dom.profileEmail.value = 'customer@example.com';
+  invalidProfile.dom.profileForm.listeners.submit[0]({ preventDefault() {} });
+  check('missing name is not stored', invalidProfile.store.getItem('cafecustomer.v1') === null);
+  invalidProfile.dom.profileName.value = 'A Customer';
+  invalidProfile.dom.profileEmail.value = 'invalid';
+  invalidProfile.dom.profileForm.listeners.submit[0]({ preventDefault() {} });
+  check('invalid first-visit email is not stored', invalidProfile.store.getItem('cafecustomer.v1') === null);
+  invalidProfile.dom.profileSkip.listeners.click[0]();
+  check('first-time visitor can continue without saving', invalidProfile.dom.profileDialog.open === false);
 
   cart.order.setMenu(MENU);
   cart.order.add(itemKey(cart.order, 'Flat White'), 2);
@@ -287,7 +348,9 @@ function check(label, condition, detail) {
     demo.requests.length === 0 && demo.order.phase() === 'placed' && /Demo only/.test(demo.dom.payStatus.textContent));
 
   check('page has no EmailJS dependency or customer paid-claim button', !/@emailjs\/browser|id="claimBtn"/.test(HTML));
-  check('page loads Apps Script transport and customer-name input', /src="submit-order\.js"/.test(HTML) && /id="orderName"/.test(HTML));
+  check('page loads Apps Script transport and customer profile controls',
+    /src="submit-order\.js"/.test(HTML) && /id="orderName"/.test(HTML) &&
+    /id="profileDialog"/.test(HTML) && /id="profileEdit"/.test(HTML));
   check('backend validates IDs and totals', BACKEND.includes('ORDER_ID_PATTERN') && BACKEND.includes('Number(data.totalPaise) !== totalPaise'));
   check('backend throttles rapid repeat orders', BACKEND.includes('CacheService.getScriptCache') && BACKEND.includes('cache.put(cooldownKey, order.orderId, 15)'));
   const sentEmails = [];

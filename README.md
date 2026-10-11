@@ -53,13 +53,15 @@ still renders and checkout explains that orders are unavailable.
 PapaParse is loaded from jsDelivr. There is no build step, npm install, or lockfile.
 ## Ordering: Apps Script and UPI
 
-1. The customer adds items, enters a name and email, and submits the cart.
+1. On the first visit, the customer can save their name and email in that browser for faster checkout later, or continue without saving. Saved details can be edited or forgotten at any time. The customer then adds items and submits the cart.
 2. The browser posts the order to Apps Script using a stable order ID so a retry cannot create a duplicate row.
 3. Apps Script writes the order to the separate `Orders` sheet, emails the customer a **Pay with UPI** HTTPS button, and emails the cafe an order notification.
 4. The button opens a payment page showing the saved amount and UPI ID. On a compatible phone, the customer taps **Open UPI app**, reviews the details, and authorizes payment. No payment gateway or QR generator is used by the site.
 5. After checking the bank app, the owner opens the email link and presses **Confirm payment received**. Apps Script updates the order and emails the customer.
 
 There is no EmailJS integration. The Apps Script Web App URL is configured in `site-config.js`; the private Sheet ID, owner email, UPI ID, cafe name, and deployment URL are configured in Apps Script. Follow [the backend setup guide](payment-backend/README.md).
+
+Customer name and email are stored only in the browser's `localStorage` under a separate profile key; cart resets do not remove them. They are not sent to the server until an order is submitted. Do not save details on a shared browser if other users may access it.
 
 ### Browser response behavior
 
