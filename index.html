@@ -24,6 +24,7 @@
       <span id="lastUpdated" class="masthead__updated"></span>
       <span id="imageSummary" class="masthead__images"></span>
     </p>
+    <button type="button" id="profileEdit" class="btn btn--ghost profile-edit">Save my details</button>
   </header>
 
   <section id="bench" class="bench" aria-labelledby="benchTitle" hidden>
@@ -180,6 +181,28 @@
     </div>
   </div>
 </aside>
+
+<dialog id="profileDialog" class="profile-dialog" aria-labelledby="profileTitle">
+  <form id="profileForm" class="profile-dialog__content" novalidate>
+    <h2 id="profileTitle">Faster checkout next time</h2>
+    <p class="profile-dialog__lead">Save your name and email in this browser. They’ll be filled in at checkout on this device.</p>
+    <label class="field">
+      <span class="field__label">Your name</span>
+      <input id="profileName" class="field__input" type="text" autocomplete="name" maxlength="100" required>
+    </label>
+    <label class="field">
+      <span class="field__label">Your email</span>
+      <input id="profileEmail" class="field__input" type="email" autocomplete="email" inputmode="email" spellcheck="false" required>
+    </label>
+    <p id="profileStatus" class="note" role="status" hidden></p>
+    <div class="profile-dialog__actions">
+      <button type="submit" class="btn">Save details</button>
+      <button type="button" id="profileSkip" class="btn btn--ghost">Continue without saving</button>
+      <button type="button" id="profileForget" class="btn btn--ghost" hidden>Forget saved details</button>
+    </div>
+    <p class="profile-dialog__fine">Only your name and email are saved here—not a password. Anyone using this browser may be able to see them. You can edit or forget them anytime.</p>
+  </form>
+</dialog>
 
 <p id="cartLive" class="status status--sr" role="status" aria-live="polite"></p>
 
