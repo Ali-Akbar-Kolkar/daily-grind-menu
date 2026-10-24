@@ -9,7 +9,7 @@ A digital cafe menu that helps reduce repeated paper printing and plastic menu s
 1. Cafe staff update the menu in the Google Sheet.
 2. The published sheet feeds the live menu webpage.
 3. Customers scan the cafe's QR code and view the menu on their phones. No app download is required.
-4. Customers send an order with their name and email. The cafe emails UPI payment details and confirms payment after checking its bank app.
+4. Customers send an order with their name and email. The cafe emails UPI payment details, and customers may opt in to receive order and payment updates on WhatsApp. The cafe confirms payment after checking its bank app.
 
 The menu is publicly viewable. Only people authorized by the cafe can edit the Google Sheet.
 
@@ -43,7 +43,7 @@ No build step, no bundler, no server. It is plain files deployed by GitHub Actio
 | `order.js` | Cart, totals, customer details, and order state. |
 | `style.css` | All styling. |
 | `menu-images.csv` | Bundled sample sheet, used when `MENU_CSV_URL` is blank. |
-| `payment-backend/Code.gs` | Apps Script order logger, email sender, and owner payment confirmation. |
+| `payment-backend/Code.gs` | Apps Script order logger, email/WhatsApp sender, and owner payment confirmation. |
 | `owner-editor/` | Private Google Apps Script editor so the owner can change the sheet from a phone. |
 
 Scripts load with `defer` in dependency order, so the Apps Script transport and `order.js` are
@@ -55,17 +55,17 @@ PapaParse is loaded from jsDelivr. There is no build step, npm install, or lockf
 
 1. On the first visit, the customer can save their name and email in that browser for faster checkout later, or continue without saving. Saved details can be edited or forgotten at any time. The customer then adds items and submits the cart.
 2. The browser posts the order to Apps Script using a stable order ID so a retry cannot create a duplicate row.
-3. Apps Script writes the order to the separate `Orders` sheet, emails the customer a **Pay with UPI** HTTPS button, and emails the cafe an order notification.
+3. Apps Script writes the order to the separate `Orders` sheet, emails the customer a **Pay with UPI** HTTPS button, and emails the cafe an order notification. With explicit customer opt-in and WhatsApp Business API setup, it also sends order and payment details by WhatsApp.
 4. The button opens a payment page showing the saved amount and UPI ID. On a compatible phone, the customer taps **Open UPI app**, reviews the details, and authorizes payment. No payment gateway or QR generator is used by the site.
-5. After checking the bank app, the owner opens the email link and presses **Confirm payment received**. Apps Script updates the order and emails the customer.
+5. After checking the bank app, the owner opens the email link and presses **Confirm payment received**. Apps Script updates the order and emails the customer, with a WhatsApp update if they opted in.
 
-There is no EmailJS integration. The Apps Script Web App URL is configured in `site-config.js`; the private Sheet ID, owner email, UPI ID, cafe name, and deployment URL are configured in Apps Script. Follow [the backend setup guide](payment-backend/README.md).
+There is no EmailJS integration. The Apps Script Web App URL is configured in `site-config.js`; the private Sheet ID, owner email, UPI ID, cafe name, and deployment URL are configured in Apps Script. WhatsApp Cloud API credentials and approved template settings are stored in Apps Script Script Properties, never in the public site. Follow [the backend setup guide](payment-backend/README.md).
 
-Customer name and email are stored only in the browser's `localStorage` under a separate profile key; cart resets do not remove them. They are not sent to the server until an order is submitted. Do not save details on a shared browser if other users may access it.
+Customer name and email are stored only in the browser's `localStorage` under a separate profile key; cart resets do not remove them. They are not sent to the server until an order is submitted. A WhatsApp number is not saved in the profile, but is retained with a pending order on the device so a retry can use the same order ID. WhatsApp messages are sent only when the customer explicitly opts in. Do not save details on a shared browser if other users may access it.
 
 ### Browser response behavior
 
-Apps Script content responses redirect to a one-time Google-hosted URL and do not provide a configurable CORS header. The browser therefore sends a `no-cors` request and cannot read the server's result. The page says to check email before paying; the customer email is the confirmation that the order was accepted. If the request fails at the network level, the cart is retained and retry uses the same order ID.
+Apps Script content responses redirect to a one-time Google-hosted URL and do not provide a configurable CORS header. The browser therefore sends a `no-cors` request and cannot read the server's result. The page says to check email before paying; the customer email is the confirmation that the order was accepted. If the request fails at the network level, the cart is retained and retry uses the same order ID. WhatsApp API acceptance is recorded separately in the private Orders sheet and does not confirm message delivery.
 
 ### Limitations and guard rails
 
@@ -73,6 +73,7 @@ Apps Script content responses redirect to a one-time Google-hosted URL and do no
 - The Web App is public so the menu can submit orders. It validates inputs, limits item count and quantities, checks the submitted total against item prices, ignores honeypot submissions, and applies a 15-second per-email cooldown, but it is not a full anti-abuse service.
 - Menu prices and quantities originate in the browser and can be manipulated. The cafe should verify the total against the order email and bank transaction.
 - Apps Script and Gmail have daily quotas. Monitor usage if order volume grows.
+- WhatsApp requires valid customer opt-in and approved utility templates. If WhatsApp is unavailable or misconfigured, the email flow remains available and WhatsApp status is recorded in the private Orders sheet.
 - `index.html?demo=1` exercises the checkout UI without submitting an order.
 
 ## Deployment

@@ -940,6 +940,20 @@ code {
   outline-offset: 1px;
 }
 
+.field--check {
+  display: flex;
+  align-items: flex-start;
+  gap: .55rem;
+  color: var(--muted);
+  font-size: .82rem;
+  line-height: 1.45;
+}
+
+.field--check input {
+  flex: 0 0 auto;
+  margin: .2rem 0 0;
+}
+
 /* honeypot: hidden from people, tempting to bots */
 /* Honeypot. Must be invisible to a human but fillable by a naive bot, so it
    uses the project's real visually-hidden pattern (clipped to nothing) rather

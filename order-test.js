@@ -11,6 +11,7 @@ const IDS = [
   'menu', 'cartBar', 'cartBarCount', 'cartBarTotal', 'cart', 'cartClose', 'stepCart',
   'cartLines', 'cartEmpty', 'cartTotal', 'cartNotice', 'cartStart', 'cartClear',
   'stepEmail', 'orderForm', 'orderName', 'orderEmail', 'orderWebsite', 'orderSubmit',
+  'orderPhone', 'whatsappOptIn',
   'orderStatus', 'stepPay', 'payTotal', 'payId', 'payStatus', 'orderAgain', 'cartLive',
   'profileEdit', 'profileDialog', 'profileForm', 'profileName', 'profileEmail',
   'profileStatus', 'profileSkip', 'profileForget'
@@ -99,6 +100,7 @@ function buildDom() {
   IDS.forEach((id) => { byId[id] = makeNode(id); });
   byId.orderWebsite.setAttribute('tabindex', '-1');
   byId.orderEmail.type = 'email';
+  byId.whatsappOptIn.checked = false;
   byId.cart.setAttribute('role', 'dialog');
   byId.cart.setAttribute('aria-modal', 'true');
   byId.cart.setAttribute('data-ready', 'false');
@@ -116,7 +118,8 @@ function buildDom() {
     ['stepEmail', ['orderForm', 'orderStatus']],
     ['stepPay', ['payTotal', 'payId', 'payStatus', 'orderAgain']]
   ].forEach(([parent, children]) => children.forEach((id) => byId[parent].appendChild(byId[id])));
-  ['orderName', 'orderEmail', 'orderWebsite', 'orderSubmit'].forEach((id) => byId.orderForm.appendChild(byId[id]));
+  ['orderName', 'orderEmail', 'orderPhone', 'whatsappOptIn', 'orderWebsite', 'orderSubmit']
+    .forEach((id) => byId.orderForm.appendChild(byId[id]));
   ['profileName', 'profileEmail', 'profileStatus', 'profileSkip', 'profileForget'].forEach((id) => byId.profileForm.appendChild(byId[id]));
   ['stepCart', 'stepEmail', 'stepPay'].forEach((id) => byId.cart.appendChild(byId[id]));
   return { document, byId };
@@ -176,6 +179,8 @@ function check(label, condition, detail) {
   const cart = await boot();
   check('rupee prices convert to paise', cart.order.toPaise(4.75) === 475);
   check('email validation remains available', cart.order.isEmail('customer@example.com'));
+  check('WhatsApp phone validation requires E.164 format',
+    cart.order.isWhatsAppPhone('+919876543210') && !cart.order.isWhatsAppPhone('9876543210'));
   check('web app URL enables ordering', cart.order.orderable() === true);
   check('drawer is marked ready', cart.dom.cart.getAttribute('data-ready') === 'true');
 
@@ -250,6 +255,8 @@ function check(label, condition, detail) {
   cart.order.add(itemKey(cart.order, 'Croissant'), 1);
   cart.dom.orderName.value = 'A Customer';
   cart.dom.orderEmail.value = 'customer@example.com';
+  cart.dom.orderPhone.value = '+919876543210';
+  cart.dom.whatsappOptIn.checked = true;
   cart.order.openCart('email');
   await cart.order.submitOrder({ preventDefault() {} });
 
@@ -259,6 +266,8 @@ function check(label, condition, detail) {
   check('request uses text/plain content type', /text\/plain/.test(cart.requests[0].init.headers['Content-Type']));
   const payload = JSON.parse(cart.requests[0].init.body);
   check('payload includes customer details', payload.customerName === 'A Customer' && payload.customerEmail === 'customer@example.com');
+  check('payload includes the opted-in WhatsApp number and consent',
+    payload.customerPhone === '+919876543210' && payload.whatsappOptIn === true);
   check('payload includes item quantities and unit prices', payload.items.length === 2 && payload.items[0].qty === 2 && payload.items[0].pricePaise === 475);
   check('payload total matches the cart', payload.totalPaise === 1275);
   check('payload includes a retry-safe order ID', payload.orderId === cart.order.order().id && /^ORD-/.test(payload.orderId));
@@ -266,7 +275,11 @@ function check(label, condition, detail) {
   check('total and order ID remain visible', cart.dom.payTotal.textContent === '₹12.75' && cart.dom.payId.textContent === payload.orderId);
   check('customer is told to wait for payment email', /check your email.*before paying/i.test(cart.dom.payStatus.textContent));
   check('cart clears after submission', cart.order.itemCount() === 0);
-  check('pending order is stored for refresh', JSON.parse(cart.store.getItem('cafecart.v1')).order.id === payload.orderId);
+  const storedPendingOrder = JSON.parse(cart.store.getItem('cafecart.v1')).order;
+  check('pending order ID, WhatsApp number, and consent are stored for retry',
+    storedPendingOrder.id === payload.orderId &&
+    storedPendingOrder.phone === '+919876543210' &&
+    storedPendingOrder.whatsappOptIn === true);
   check('customer can start another order', cart.dom.orderAgain.hidden === false);
   check('pending order remains reachable from the sticky bar',
     cart.dom.cartBar.hidden === false && cart.dom.cartBarCount.textContent === 'Order pending');
@@ -297,6 +310,17 @@ function check(label, condition, detail) {
   await missingEmail.order.submitOrder({ preventDefault() {} });
   check('invalid email blocks submission', missingEmail.requests.length === 0 && /valid email/i.test(missingEmail.dom.orderStatus.textContent));
 
+  const invalidWhatsApp = await boot();
+  invalidWhatsApp.order.setMenu(MENU);
+  invalidWhatsApp.order.add(itemKey(invalidWhatsApp.order, 'Flat White'), 1);
+  invalidWhatsApp.dom.orderName.value = 'A Customer';
+  invalidWhatsApp.dom.orderEmail.value = 'customer@example.com';
+  invalidWhatsApp.dom.orderPhone.value = '9876543210';
+  invalidWhatsApp.dom.whatsappOptIn.checked = true;
+  await invalidWhatsApp.order.submitOrder({ preventDefault() {} });
+  check('invalid or missing international phone blocks WhatsApp opt-in',
+    invalidWhatsApp.requests.length === 0 && /international format/i.test(invalidWhatsApp.dom.orderStatus.textContent));
+
   const missingConfig = await boot({ config: { appsScriptUrl: '' } });
   missingConfig.order.setMenu(MENU);
   missingConfig.order.add(itemKey(missingConfig.order, 'Flat White'), 1);
@@ -315,9 +339,13 @@ function check(label, condition, detail) {
   retry.order.add(itemKey(retry.order, 'Flat White'), 1);
   retry.dom.orderName.value = 'A Customer';
   retry.dom.orderEmail.value = 'customer@example.com';
+  retry.dom.orderPhone.value = 'not-used-without-consent';
   await retry.order.submitOrder({ preventDefault() {} });
   const retryId = retry.order.order().id;
   check('network failure retains the cart and retry ID', retry.order.phase() === 'error' && retry.order.itemCount() === 1);
+  check('email-only checkout neither validates nor sends an unconsented phone number',
+    JSON.parse(retry.requests[0].init.body).customerPhone === '' &&
+    JSON.parse(retry.requests[0].init.body).whatsappOptIn === false);
   const failedResume = await boot({ storage: retry.store });
   check('failed request restores in retry state', failedResume.order.phase() === 'error' && failedResume.order.order().id === retryId);
   check('failed request restores customer details', failedResume.dom.orderName.value === 'A Customer' && failedResume.dom.orderEmail.value === 'customer@example.com');
@@ -350,13 +378,24 @@ function check(label, condition, detail) {
   check('page has no EmailJS dependency or customer paid-claim button', !/@emailjs\/browser|id="claimBtn"/.test(HTML));
   check('page loads Apps Script transport and customer profile controls',
     /src="submit-order\.js"/.test(HTML) && /id="orderName"/.test(HTML) &&
+    /id="orderPhone"/.test(HTML) && /id="whatsappOptIn"/.test(HTML) &&
     /id="profileDialog"/.test(HTML) && /id="profileEdit"/.test(HTML));
   check('backend validates IDs and totals', BACKEND.includes('ORDER_ID_PATTERN') && BACKEND.includes('Number(data.totalPaise) !== totalPaise'));
   check('backend throttles rapid repeat orders', BACKEND.includes('CacheService.getScriptCache') && BACKEND.includes('cache.put(cooldownKey, order.orderId, 15)'));
   const sentEmails = [];
   const qrRequests = [];
+  const whatsappRequests = [];
   const backendErrors = [];
   let qrServiceFails = false;
+  let whatsappApiFails = false;
+  const scriptProperties = {
+    WHATSAPP_ACCESS_TOKEN: 'test-access-token',
+    WHATSAPP_PHONE_NUMBER_ID: '123456789',
+    WHATSAPP_API_VERSION: 'v22.0',
+    WHATSAPP_ORDER_TEMPLATE: 'order_received',
+    WHATSAPP_PAYMENT_TEMPLATE: 'payment_confirmed',
+    WHATSAPP_TEMPLATE_LANGUAGE: 'en_US'
+  };
   const qrImage = {
     getContentType() { return 'image/png'; },
     setName(name) { this.name = name; return this; }
@@ -366,6 +405,17 @@ function check(label, condition, detail) {
     MailApp: { sendEmail(message) { sentEmails.push(message); } },
     UrlFetchApp: {
       fetch(url, options) {
+        if (url.includes('graph.facebook.com')) {
+          whatsappRequests.push({ url, options });
+          return {
+            getResponseCode() { return whatsappApiFails ? 400 : 200; },
+            getContentText() {
+              return whatsappApiFails
+                ? JSON.stringify({ error: { message: 'Invalid template' } })
+                : JSON.stringify({ messages: [{ id: 'wamid.test' }] });
+            }
+          };
+        }
         qrRequests.push({ url, options });
         return {
           getResponseCode() {
@@ -373,6 +423,11 @@ function check(label, condition, detail) {
           },
           getBlob() { return qrImage; }
         };
+      }
+    },
+    PropertiesService: {
+      getScriptProperties() {
+        return { getProperty(name) { return scriptProperties[name] || ''; } };
       }
     },
     console: {
@@ -387,6 +442,68 @@ function check(label, condition, detail) {
     qrRequests.length === 1 &&
     qrRequests[0].url.includes(encodeURIComponent('ORD-QRTEST123')) &&
     backendErrors.some((message) => message.includes('QR image service authorized')));
+  const validationOrder = {
+    orderId: 'ORD-WHATSAPP123',
+    customerName: 'A Customer',
+    customerEmail: 'customer@example.com',
+    customerPhone: '+919876543210',
+    whatsappOptIn: true,
+    items: [{ name: 'Test item', qty: 1, pricePaise: 575 }],
+    totalPaise: 575
+  };
+  const validatedOrder = vm.runInContext(
+    'validateOrder_(' + JSON.stringify(validationOrder) + ')',
+    backendContext
+  );
+  check('backend validates and retains WhatsApp consent and phone',
+    validatedOrder.customerPhone === '+919876543210' && validatedOrder.whatsappOptIn === true);
+  const invalidOptIn = Object.assign({}, validationOrder, { customerPhone: '' });
+  check('backend rejects WhatsApp opt-in without a phone number',
+    vm.runInContext(
+      'try { validateOrder_(' + JSON.stringify(invalidOptIn) + '); false; } catch (error) { /WhatsApp number/.test(error.message); }',
+      backendContext
+    ));
+  const unconsentedPhone = Object.assign({}, validationOrder, {
+    customerPhone: '+919876543210',
+    whatsappOptIn: false
+  });
+  check('backend discards a WhatsApp number when consent was not given',
+    vm.runInContext(
+      'validateOrder_(' + JSON.stringify(unconsentedPhone) + ').customerPhone === ""',
+      backendContext
+    ));
+  vm.runInContext(
+    "sendWhatsAppOrderMessage_({ orderId: 'ORD-TEST123', customerName: 'A Customer', customerPhone: '+919876543210', itemsText: '1 x Test item', totalPaise: 575 })",
+    backendContext
+  );
+  const whatsappOrderRequest = whatsappRequests[0];
+  const whatsappOrderPayload = JSON.parse(whatsappOrderRequest.options.payload);
+  check('WhatsApp order template includes the phone, payment link, and template data',
+    whatsappOrderRequest.url === 'https://graph.facebook.com/v22.0/123456789/messages' &&
+    whatsappOrderRequest.options.headers.Authorization === 'Bearer test-access-token' &&
+    whatsappOrderPayload.to === '919876543210' &&
+    whatsappOrderPayload.template.name === 'order_received' &&
+    whatsappOrderPayload.template.components[0].parameters.length === 7 &&
+    whatsappOrderPayload.template.components[0].parameters[6].text.includes('action=pay'));
+  check('WhatsApp order is skipped when customer did not opt in',
+    vm.runInContext(
+      "attemptWhatsAppOrderMessage_({ orderId: 'ORD-TEST124', whatsappOptIn: false })",
+      backendContext
+    ) === 'Not opted in' && whatsappRequests.length === 1);
+  check('payment-confirmed WhatsApp template is sent independently',
+    vm.runInContext(
+      "attemptWhatsAppPaymentMessage_('+919876543210', true, 'A Customer', 'ORD-TEST123')",
+      backendContext
+    ) === 'Accepted' &&
+    JSON.parse(whatsappRequests[1].options.payload).template.name === 'payment_confirmed');
+  whatsappApiFails = true;
+  check('WhatsApp API errors are logged and returned as a failed channel status',
+    vm.runInContext(
+      "attemptWhatsAppPaymentMessage_('+919876543210', true, 'A Customer', 'ORD-TEST123')",
+      backendContext
+    ) === 'Failed' &&
+    backendErrors.some((message) => message.includes('Invalid template')));
+  whatsappApiFails = false;
   const upiUrl = vm.runInContext("upiPaymentUrl_({ totalPaise: 575, orderId: 'ORD-TEST123' })", backendContext);
   check('customer email UPI link includes amount and order reference',
     /upi:\/\/pay\?.*am=5\.75.*cu=INR.*tn=ORD-TEST123.*tr=ORD-TEST123/.test(upiUrl));

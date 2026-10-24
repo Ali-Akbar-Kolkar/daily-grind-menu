@@ -145,6 +145,10 @@
     return /^[^@]{1,64}@[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)*\.[A-Za-z]{2,}$/.test(text);
   }
 
+  function isWhatsAppPhone(value) {
+    return /^\+[1-9]\d{7,14}$/.test(String(value == null ? '' : value).trim());
+  }
+
   var ALPHABET = '0123456789ABCDEFGHJKLMNPQRSTUVWXYZ';
 
   function randomChunk(length) {
@@ -187,7 +191,8 @@
   var IDS = [
     'menu', 'cartBar', 'cartBarCount', 'cartBarTotal', 'cart', 'cartClose',
     'stepCart', 'cartLines', 'cartEmpty', 'cartTotal', 'cartNotice', 'cartStart',
-    'cartClear', 'stepEmail', 'orderForm', 'orderName', 'orderEmail', 'orderWebsite',
+    'cartClear', 'stepEmail', 'orderForm', 'orderName', 'orderEmail', 'orderPhone',
+    'whatsappOptIn', 'orderWebsite',
     'orderSubmit', 'orderStatus', 'stepPay', 'payTotal', 'payId',
     'payStatus', 'orderAgain', 'cartLive', 'profileEdit', 'profileDialog',
     'profileForm', 'profileName', 'profileEmail', 'profileStatus', 'profileSkip',
@@ -228,6 +233,8 @@
           id: order.id,
           customerName: order.customerName,
           email: order.email,
+          phone: order.phone || '',
+          whatsappOptIn: Boolean(order.whatsappOptIn),
           totalPaise: order.totalPaise,
           lines: order.lines,
           createdAt: order.createdAt
@@ -299,7 +306,11 @@
     var declaredTotal = Number(saved && saved.totalPaise);
     if (!saved || typeof saved.id !== 'string' || !/^ORD-[A-Z0-9-]+$/.test(saved.id) ||
       (saved.customerName != null && (typeof saved.customerName !== 'string' || saved.customerName.length > 100)) ||
-        !isEmail(saved.email) || !Array.isArray(saved.lines) || !saved.lines.length ||
+        !isEmail(saved.email) ||
+        (saved.phone != null && saved.phone !== '' && !isWhatsAppPhone(saved.phone)) ||
+        (saved.whatsappOptIn != null && typeof saved.whatsappOptIn !== 'boolean') ||
+        (saved.whatsappOptIn && !isWhatsAppPhone(saved.phone)) ||
+        !Array.isArray(saved.lines) || !saved.lines.length ||
         saved.lines.length > config.maxLines || !isFinite(createdAt) || createdAt <= 0 ||
         !isFinite(declaredTotal) || declaredTotal < 0 || Math.floor(declaredTotal) !== declaredTotal) return false;
 
@@ -796,6 +807,8 @@
     }
     if (dom.orderName) dom.orderName.disabled = busy;
     if (dom.orderEmail) dom.orderEmail.disabled = busy;
+    if (dom.orderPhone) dom.orderPhone.disabled = busy;
+    if (dom.whatsappOptIn) dom.whatsappOptIn.disabled = busy;
 
     if (dom.payTotal) dom.payTotal.textContent = order ? money(order.totalPaise) : money(totalPaise());
     if (dom.payId) dom.payId.textContent = order ? order.id : '';
@@ -868,11 +881,13 @@
     return 'The order request could not be sent. Your cart is safe; please try again or ask a staff member.';
   }
 
-  function snapshot(customerName, email) {
+  function snapshot(customerName, email, phone, whatsappOptIn) {
     return {
       id: makeOrderId(),
       customerName: customerName,
       email: email,
+      phone: phone,
+      whatsappOptIn: whatsappOptIn,
       totalPaise: totalPaise(),
       lines: lines.map(function (line) {
         return {
@@ -889,6 +904,7 @@
 
   function sameOrderRequest(saved, candidate) {
     if (!saved || saved.customerName !== candidate.customerName || saved.email !== candidate.email ||
+        (saved.phone || '') !== candidate.phone || Boolean(saved.whatsappOptIn) !== candidate.whatsappOptIn ||
         saved.totalPaise !== candidate.totalPaise || saved.lines.length !== candidate.lines.length) return false;
     return saved.lines.every(function (line, index) {
       var next = candidate.lines[index];
@@ -901,6 +917,8 @@
       orderId: order.id,
       customerName: order.customerName,
       customerEmail: order.email,
+      customerPhone: order.phone,
+      whatsappOptIn: order.whatsappOptIn,
       items: order.lines.map(function (line) {
         return { name: line.name, qty: line.qty, pricePaise: line.pricePaise };
       }),
@@ -917,7 +935,7 @@
     if (event && typeof event.preventDefault === 'function') event.preventDefault();
     if (phase === 'sending') return;
     if (phase === 'awaiting-payment') {
-      say(dom.payStatus, 'This order request was already sent. Check your email, or start a new order.', 'warn');
+      say(dom.payStatus, 'This order request was already sent. Check your email (and WhatsApp if you opted in), or start a new order.', 'warn');
       return;
     }
 
@@ -932,6 +950,10 @@
 
     var customerName = String((dom.orderName && dom.orderName.value) || '').trim();
     var email = String((dom.orderEmail && dom.orderEmail.value) || '').trim();
+    var whatsappOptIn = Boolean(dom.whatsappOptIn && dom.whatsappOptIn.checked);
+    var phone = whatsappOptIn
+      ? String((dom.orderPhone && dom.orderPhone.value) || '').trim()
+      : '';
 
     /* checked before the empty-cart case, so an item the cafe removed is not
        reported back to the customer as "your cart is empty" */
@@ -961,13 +983,19 @@
       if (dom.orderEmail && typeof dom.orderEmail.focus === 'function') dom.orderEmail.focus();
       return;
     }
+    if (whatsappOptIn && !isWhatsAppPhone(phone)) {
+      say(dom.orderStatus, 'Enter your WhatsApp number in international format before opting in.', 'warn');
+      render();
+      if (dom.orderPhone && typeof dom.orderPhone.focus === 'function') dom.orderPhone.focus();
+      return;
+    }
 
     if (!demo && !backendReady()) {
       sayNotConfigured();
       return;
     }
 
-    var candidate = snapshot(customerName, email);
+    var candidate = snapshot(customerName, email, phone, whatsappOptIn);
     if (phase !== 'error' || !sameOrderRequest(order, candidate)) order = candidate;
 
     phase = 'sending';
@@ -1000,10 +1028,10 @@
     render();
     say(dom.payStatus, demo
       ? 'Demo only: no order was sent and no email was sent. Configure Apps Script before accepting payment.'
-      : 'Order request sent. Check your email for the order confirmation and UPI payment details before paying. Use the order ID as the payment reference.', 'ok');
+      : 'Order request sent. Check your email (and WhatsApp if you opted in) for the order confirmation and UPI payment details before paying. Use the order ID as the payment reference.', 'ok');
     announce(demo
       ? 'Demo complete. No order was sent.'
-      : 'Order request ' + order.id + ' sent. Check your email for confirmation and UPI payment details.');
+      : 'Order request ' + order.id + ' sent. Check your email and, if you opted in, WhatsApp for confirmation and UPI payment details.');
   }
 
   function startNewOrder() {
@@ -1011,6 +1039,8 @@
     clearStorage();
     if (dom.orderName) dom.orderName.value = customerProfile ? customerProfile.name : '';
     if (dom.orderEmail) dom.orderEmail.value = customerProfile ? customerProfile.email : '';
+    if (dom.orderPhone) dom.orderPhone.value = '';
+    if (dom.whatsappOptIn) dom.whatsappOptIn.checked = false;
     if (dom.orderWebsite) dom.orderWebsite.value = '';
     say(dom.payStatus, '', null);
     say(dom.orderStatus, '', null);
@@ -1119,11 +1149,13 @@
     if (order && phase === 'awaiting-payment') {
       showStep('pay');
       say(dom.payStatus,
-        'Your order request was sent. Check your email for the cafe\'s payment instructions. The cafe will email you after payment is verified.', 'ok');
+        'Your order request was sent. Check your email (and WhatsApp if you opted in) for payment instructions. The cafe will email you after payment is verified.', 'ok');
     } else if (order && phase === 'error') {
       showStep('email');
       if (dom.orderName) dom.orderName.value = order.customerName || '';
       if (dom.orderEmail) dom.orderEmail.value = order.email;
+      if (dom.orderPhone) dom.orderPhone.value = order.phone || '';
+      if (dom.whatsappOptIn) dom.whatsappOptIn.checked = Boolean(order.whatsappOptIn);
       say(dom.orderStatus, 'The last request may not have reached the cafe. Retry to use the same order ID, or start a new order.', 'warn');
     }
     render();
@@ -1146,6 +1178,7 @@
     slug: slug,
     itemKey: itemKey,
     isEmail: isEmail,
+    isWhatsAppPhone: isWhatsAppPhone,
     makeOrderId: makeOrderId,
     lineText: lineText,
     orderLinesText: orderLinesText,
