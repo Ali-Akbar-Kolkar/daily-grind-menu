@@ -496,12 +496,21 @@ function check(label, condition, detail) {
       backendContext
     ) === 'Accepted' &&
     JSON.parse(whatsappRequests[1].options.payload).template.name === 'payment_confirmed');
+  check('WhatsApp setup checker verifies properties without sending a message',
+    vm.runInContext('checkWhatsAppConfiguration()', backendContext).includes('No message was sent') &&
+    whatsappRequests.length === 2);
+  const savedApiVersion = scriptProperties.WHATSAPP_API_VERSION;
+  delete scriptProperties.WHATSAPP_API_VERSION;
+  check('WhatsApp setup checker names missing Script Properties without revealing secrets',
+    vm.runInContext('checkWhatsAppConfiguration()', backendContext).includes('WHATSAPP_API_VERSION') &&
+    !vm.runInContext('checkWhatsAppConfiguration()', backendContext).includes('test-access-token'));
+  scriptProperties.WHATSAPP_API_VERSION = savedApiVersion;
   whatsappApiFails = true;
   check('WhatsApp API errors are logged and returned as a failed channel status',
     vm.runInContext(
       "attemptWhatsAppPaymentMessage_('+919876543210', true, 'A Customer', 'ORD-TEST123')",
       backendContext
-    ) === 'Failed' &&
+    ).startsWith('Failed: WhatsApp API returned HTTP 400: Invalid template') &&
     backendErrors.some((message) => message.includes('Invalid template')));
   whatsappApiFails = false;
   const upiUrl = vm.runInContext("upiPaymentUrl_({ totalPaise: 575, orderId: 'ORD-TEST123' })", backendContext);
