@@ -10,7 +10,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Karla:wght@400;500;700&display=swap">
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=20261025-developer-credit">
 </head>
 <body>
 <div class="page">
@@ -91,7 +91,13 @@
     <p>Prices include tax. Ask about allergens before ordering.</p>
     <button type="button" id="refresh" class="btn btn--ghost" hidden>Refresh menu</button>
     <p class="footer__credit">Photos come from the <code>Image</code> or <code>Image URL</code> column of the published Google Sheet. Card photos that fail are listed in the browser console. The cafe emails payment instructions after receiving an order and can send WhatsApp updates when customers opt in; this page never takes payment.</p>
-    <p class="footer__credit">Copyright &copy;<script>document.write(new Date().getFullYear());</script> All rights reserved | Developed by <a href="https://ali-akbar-k.github.io/PORTFOLIO/" target="_blank" rel="noopener noreferrer">Ali-Akbar-K</a></p>
+    <p class="footer__credit">Copyright &copy;<script>document.write(new Date().getFullYear());</script> All rights reserved</p>
+    <p class="footer__credit developer-credit">Designed &amp; developed by
+      <a class="developer-credit__link" href="https://ali-akbar-k.github.io/PORTFOLIO/" target="_blank" rel="noopener noreferrer">
+        <img src="developer-avatar.png" alt="" width="28" height="28">
+        <span>Ali-Akbar-K</span>
+      </a>
+    </p>
   </footer>
 
 </div>
@@ -198,7 +204,12 @@
           <p class="pay__verify">Only the cafe’s email confirms payment. Contact the cafe if you need to cancel.</p>
 
           <p id="payStatus" class="note" role="status" hidden></p>
-          <p class="pay__developer">Developed by <a href="https://ali-akbar-k.github.io/PORTFOLIO/" target="_blank" rel="noopener noreferrer">Ali-Akbar-K</a></p>
+          <p class="pay__developer developer-credit">Designed &amp; developed by
+            <a class="developer-credit__link" href="https://ali-akbar-k.github.io/PORTFOLIO/" target="_blank" rel="noopener noreferrer">
+              <img src="developer-avatar.png" alt="" width="28" height="28">
+              <span>Ali-Akbar-K</span>
+            </a>
+          </p>
 
           <div class="cart__actions">
             <button type="button" id="orderAgain" class="btn btn--ghost" hidden>Start a new order</button>
@@ -243,7 +254,7 @@
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5/papaparse.min.js" defer></script>
 <script src="submit-order.js" defer></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js" defer></script>
-<script src="order.js?v=20261025-profile-phone" defer></script>
+<script src="order.js?v=20261025-developer-credit" defer></script>
 <script src="script.js" defer></script>
 </body>
 </html>

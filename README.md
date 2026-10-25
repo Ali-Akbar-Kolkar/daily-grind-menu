@@ -105,6 +105,8 @@ Apps Script content responses redirect to a one-time Google-hosted URL and do no
 - The on-page QR uses the pinned `qrcode-generator` 1.4.4 script from cdnjs.
   QR generation runs in the browser; the email QR continues to use the separate
   existing Apps Script QR-image flow.
+- The developer credit on the menu and payment view uses the small local
+  `developer-avatar.png` image, sourced from the public portfolio icon.
 - To manually test the on-page payment step, open `index.html?demo=1` on a
   phone, submit a demo order, confirm the QR is display-only, tap **Open UPI app**
   and try **Download QR (JPG)**. The downloaded JPG contains the same

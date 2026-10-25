@@ -705,8 +705,9 @@ function check(label, condition, detail) {
   check('pinned QR library loads before order.js',
     HTML.indexOf('https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js') !== -1 &&
     HTML.indexOf('qrcode-generator/1.4.4/qrcode.min.js') < HTML.indexOf('src="order.js?v='));
-  check('profile phone update uses a cache-busted order script',
-    /src="order\.js\?v=20261025-profile-phone"[^>]*defer/.test(HTML));
+  check('profile and developer updates use cache-busted assets',
+    /href="style\.css\?v=20261025-developer-credit"/.test(HTML) &&
+    /src="order\.js\?v=20261025-developer-credit"[^>]*defer/.test(HTML));
   check('WhatsApp link opens safely and explains the manual backup confirmation',
     /id="whatsappOrder"[^>]*target="_blank"[^>]*rel="noopener noreferrer"[^>]*hidden/.test(HTML) &&
     /Optional: send your order to the cafe on WhatsApp\./.test(HTML));
@@ -715,7 +716,15 @@ function check(label, condition, detail) {
     /Having trouble\? Open payment page/.test(HTML) &&
     !/id="paymentPageLink"[^>]*class="btn/.test(HTML));
   check('developer credit appears on menu and payment screens',
-    (HTML.match(/Developed by <a href="https:\/\/ali-akbar-k\.github\.io\/PORTFOLIO\/"/g) || []).length === 2);
+    (HTML.match(/Designed &amp; developed by/g) || []).length === 2 &&
+    (HTML.match(/src="developer-avatar\.png" alt="" width="28" height="28"/g) || []).length === 2 &&
+    (HTML.match(/class="developer-credit__link" href="https:\/\/ali-akbar-k\.github\.io\/PORTFOLIO\/"/g) || []).length === 2);
+  const STYLES = fs.readFileSync(path.join(__dirname, 'style.css'), 'utf8');
+  check('payment links have clean styling with underline only on interaction',
+    /\.upi-payment__download\s*\{[^}]*text-decoration:\s*none/s.test(STYLES) &&
+    /\.pay__payment-link\s*\{[^}]*text-decoration:\s*none/s.test(STYLES) &&
+    /\.developer-credit__link\s*\{[^}]*text-decoration:\s*none/s.test(STYLES) &&
+    /\.developer-credit__link:hover,\s*\.developer-credit__link:focus-visible\s*\{[^}]*text-decoration:\s*underline/s.test(STYLES));
   check('backend validates IDs and totals', BACKEND.includes('ORDER_ID_PATTERN') && BACKEND.includes('Number(data.totalPaise) !== totalPaise'));
   check('backend throttles rapid repeat orders', BACKEND.includes('CacheService.getScriptCache') && BACKEND.includes('cache.put(cooldownKey, order.orderId, 15)'));
   const sentEmails = [];

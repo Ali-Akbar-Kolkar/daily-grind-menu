@@ -1009,6 +1009,12 @@ code {
   margin: .2rem 0 .4rem;
   font-size: .8rem;
   color: var(--coffee);
+  text-decoration: none;
+}
+
+.pay__payment-link:hover,
+.pay__payment-link:focus-visible {
+  text-decoration: underline;
 }
 
 .upi-payment[hidden],
@@ -1041,6 +1047,10 @@ code {
   border: 1px solid var(--line);
   border-radius: 10px;
   background: #fff;
+}
+
+.upi-payment__download {
+  text-decoration: none;
 }
 
 .upi-payment__qr svg {
@@ -1109,7 +1119,36 @@ code {
   color: var(--muted);
 }
 
-.pay__developer a { color: inherit; }
+.developer-credit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: .35rem;
+}
+
+.developer-credit__link {
+  display: inline-flex;
+  align-items: center;
+  gap: .3rem;
+  color: var(--coffee);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.developer-credit__link:hover,
+.developer-credit__link:focus-visible {
+  color: var(--espresso);
+  text-decoration: underline;
+  text-underline-offset: .15em;
+}
+
+.developer-credit__link img {
+  display: block;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 50%;
+  object-fit: cover;
+}
 
 /* ---------- footer ---------- */
 
