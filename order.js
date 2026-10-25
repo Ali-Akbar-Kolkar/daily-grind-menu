@@ -220,6 +220,14 @@
     return 'https://wa.me/' + phone + '?text=' + encodeURIComponent(message);
   }
 
+  function buildPaymentPageUrl(orderId, options) {
+    options = options || {};
+    var baseUrl = String(options.appsScriptUrl || '').trim();
+    if (!/^https:\/\/script\.google\.com\/macros\/s\/[^/?#]+\/exec$/.test(baseUrl) ||
+        !/^ORD-[A-Z0-9-]{6,40}$/.test(String(orderId || ''))) return '';
+    return baseUrl + '?action=pay&orderId=' + encodeURIComponent(orderId);
+  }
+
   function buildUpiLink(order, options) {
     options = options || {};
     var upiId = String(options.upiId || '').trim();
@@ -250,7 +258,7 @@
     'cartClear', 'stepEmail', 'orderForm', 'orderName', 'orderEmail', 'orderPhone',
     'whatsappOptIn', 'orderWebsite',
     'orderSubmit', 'orderStatus', 'stepPay', 'payTotal', 'payId',
-    'payStatus', 'whatsappOrder', 'upiPayment', 'upiOpen', 'upiQr', 'upiQrFallback',
+    'payStatus', 'paymentPageLink', 'whatsappOrder', 'upiPayment', 'upiOpen', 'upiQr', 'upiQrFallback',
     'upiAmount', 'upiOrderId', 'upiIdText', 'upiCopy', 'upiCopyStatus',
     'orderAgain', 'cartLive', 'profileEdit', 'profileDialog',
     'profileForm', 'profileName', 'profileEmail', 'profileStatus', 'profileSkip',
@@ -826,7 +834,16 @@
     if (dom.stepCart) dom.stepCart.hidden = next !== 'cart';
     if (dom.stepEmail) dom.stepEmail.hidden = next !== 'email';
     if (dom.stepPay) dom.stepPay.hidden = next !== 'pay';
+    updatePaymentPageLink();
     updateWhatsAppOrderLink();
+  }
+
+  function updatePaymentPageLink() {
+    if (!dom.paymentPageLink) return;
+    var paymentStep = phase === 'awaiting-payment' || (demo && phase === 'placed');
+    var url = order && paymentStep ? buildPaymentPageUrl(order.id, config) : '';
+    dom.paymentPageLink.hidden = !url;
+    dom.paymentPageLink.setAttribute('href', url);
   }
 
   function updateWhatsAppOrderLink() {
@@ -964,6 +981,7 @@
 
     if (dom.payTotal) dom.payTotal.textContent = order ? money(order.totalPaise) : money(totalPaise());
     if (dom.payId) dom.payId.textContent = order ? order.id : '';
+    updatePaymentPageLink();
     updateWhatsAppOrderLink();
     updateUpiPayment();
 
@@ -1338,6 +1356,7 @@
     lineText: lineText,
     orderLinesText: orderLinesText,
     backendPayload: backendPayload,
+    buildPaymentPageUrl: buildPaymentPageUrl,
     buildWhatsAppUrl: buildWhatsAppUrl,
     buildUpiLink: buildUpiLink,
 

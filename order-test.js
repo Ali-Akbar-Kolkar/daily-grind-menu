@@ -12,7 +12,7 @@ const IDS = [
   'cartLines', 'cartEmpty', 'cartTotal', 'cartNotice', 'cartStart', 'cartClear',
   'stepEmail', 'orderForm', 'orderName', 'orderEmail', 'orderWebsite', 'orderSubmit',
   'orderPhone', 'whatsappOptIn',
-  'orderStatus', 'stepPay', 'payTotal', 'payId', 'payStatus', 'whatsappOrder',
+  'orderStatus', 'stepPay', 'payTotal', 'payId', 'payStatus', 'paymentPageLink', 'whatsappOrder',
   'upiPayment', 'upiOpen', 'upiQr', 'upiQrFallback', 'upiAmount', 'upiOrderId',
   'upiIdText', 'upiCopy', 'upiCopyStatus', 'orderAgain', 'cartLive',
   'profileEdit', 'profileDialog', 'profileForm', 'profileName', 'profileEmail',
@@ -138,7 +138,7 @@ function buildDom() {
   [
     ['stepCart', ['cartEmpty', 'cartLines', 'cartNotice', 'cartTotal', 'cartStart', 'cartClear']],
     ['stepEmail', ['orderForm', 'orderStatus']],
-    ['stepPay', ['payTotal', 'payId', 'payStatus', 'whatsappOrder', 'upiPayment', 'orderAgain']]
+    ['stepPay', ['payTotal', 'payId', 'payStatus', 'paymentPageLink', 'whatsappOrder', 'upiPayment', 'orderAgain']]
   ].forEach(([parent, children]) => children.forEach((id) => byId[parent].appendChild(byId[id])));
   ['upiOpen', 'upiQr', 'upiQrFallback', 'upiAmount', 'upiOrderId', 'upiIdText', 'upiCopy', 'upiCopyStatus']
     .forEach((id) => byId.upiPayment.appendChild(byId[id]));
@@ -319,6 +319,10 @@ function check(label, condition, detail) {
   check('payload includes a retry-safe order ID', payload.orderId === cart.order.order().id && /^ORD-/.test(payload.orderId));
   check('order moves to payment pending', cart.order.phase() === 'awaiting-payment');
   check('total and order ID remain visible', cart.dom.payTotal.textContent === '₹12.75' && cart.dom.payId.textContent === payload.orderId);
+  check('Pay with UPI opens the matching Apps Script payment page',
+    cart.dom.paymentPageLink.hidden === false &&
+    cart.dom.paymentPageLink.getAttribute('href') === CONFIG.appsScriptUrl +
+      '?action=pay&orderId=' + encodeURIComponent(payload.orderId));
   check('customer is told to wait for payment email', /check your email.*before paying/i.test(cart.dom.payStatus.textContent));
   check('on-page UPI QR appears with order-specific payment details',
     cart.dom.upiPayment.hidden === false &&
@@ -341,6 +345,9 @@ function check(label, condition, detail) {
   const pendingResume = await boot({ storage: cart.store });
   check('successful pending order restores in payment-pending state',
     pendingResume.order.phase() === 'awaiting-payment' && pendingResume.order.step() === 'pay');
+  check('payment page link is restored for a pending order',
+    pendingResume.dom.paymentPageLink.hidden === false &&
+    pendingResume.dom.paymentPageLink.getAttribute('href') === cart.dom.paymentPageLink.getAttribute('href'));
   check('UPI QR block is restored for a pending order',
     pendingResume.dom.upiPayment.hidden === false &&
     pendingResume.dom.upiOpen.getAttribute('href') === cart.dom.upiOpen.getAttribute('href') &&
@@ -358,6 +365,9 @@ function check(label, condition, detail) {
     pendingResume.dom.upiPayment.hidden === true &&
     pendingResume.dom.upiQr.hidden === true &&
     pendingResume.dom.upiOpen.getAttribute('href') === '');
+  check('starting a new order clears the payment page link',
+    pendingResume.dom.paymentPageLink.hidden === true &&
+    pendingResume.dom.paymentPageLink.getAttribute('href') === '');
   await cart.order.submitOrder({ preventDefault() {} });
   check('pending order is not submitted twice', cart.requests.length === 1);
 
@@ -442,6 +452,13 @@ function check(label, condition, detail) {
     waMessage.includes('2 x Flat White') &&
     waMessage.includes('1 x Croissant') &&
     waMessage.includes('Please send the UPI payment details.'));
+  const builtPaymentPageUrl = cart.order.buildPaymentPageUrl(waOrder.id, CONFIG);
+  check('payment page URL uses the email link format and order ID only',
+    builtPaymentPageUrl === CONFIG.appsScriptUrl + '?action=pay&orderId=ORD-WA123456' &&
+    !/[?&](?:am|pa|pn|token|signature)=/.test(builtPaymentPageUrl));
+  check('payment page URL rejects invalid IDs and missing Apps Script URL',
+    cart.order.buildPaymentPageUrl('bad-id', CONFIG) === '' &&
+    cart.order.buildPaymentPageUrl(waOrder.id, Object.assign({}, CONFIG, { appsScriptUrl: '' })) === '');
   const noWhatsApp = await boot({ config: { whatsappNumber: '' } });
   const invalidWhatsAppNumber = await boot({ config: { whatsappNumber: '+919876543210' } });
   check('missing or invalid WhatsApp number returns empty URL and keeps button hidden',
@@ -450,6 +467,14 @@ function check(label, condition, detail) {
     cart.order.buildWhatsAppUrl(waOrder, { whatsappNumber: '+919876543210' }) === '' &&
     noWhatsApp.dom.whatsappOrder.hidden &&
     invalidWhatsAppNumber.dom.whatsappOrder.hidden);
+  noWhatsApp.order.setMenu(MENU);
+  noWhatsApp.order.add(itemKey(noWhatsApp.order, 'Flat White'), 1);
+  noWhatsApp.dom.orderName.value = 'A Customer';
+  noWhatsApp.dom.orderEmail.value = 'customer@example.com';
+  await noWhatsApp.order.submitOrder({ preventDefault() {} });
+  check('Pay with UPI remains available while WhatsApp stays hidden without a number',
+    noWhatsApp.dom.paymentPageLink.hidden === false &&
+    noWhatsApp.dom.whatsappOrder.hidden === true);
   const longOrder = Object.assign({}, waOrder, {
     lines: Array.from({ length: 30 }, (_, index) => ({
       qty: index + 1,
@@ -572,6 +597,10 @@ function check(label, condition, detail) {
   check('demo payment step shows WhatsApp click-to-chat without sending automatically',
     demo.dom.whatsappOrder.hidden === false &&
     demo.dom.whatsappOrder.getAttribute('href').startsWith('https://wa.me/919876543210?text='));
+  check('demo payment step builds the same order-specific payment-page URL',
+    demo.dom.paymentPageLink.hidden === false &&
+    demo.dom.paymentPageLink.getAttribute('href') === CONFIG.appsScriptUrl +
+      '?action=pay&orderId=' + encodeURIComponent(demo.order.order().id));
 
   check('page has no EmailJS dependency or customer paid-claim button', !/@emailjs\/browser|id="claimBtn"/.test(HTML));
   check('page loads Apps Script transport and customer profile controls',
@@ -585,6 +614,10 @@ function check(label, condition, detail) {
     /id="whatsappOrder"[^>]*target="_blank"[^>]*rel="noopener noreferrer"[^>]*hidden/.test(HTML) &&
     /Optional: message the cafe on WhatsApp\./.test(HTML) &&
     /backup confirmation the cafe will see/.test(HTML));
+  check('payment page button opens safely and explains the not-found retry',
+    /id="paymentPageLink"[^>]*target="_blank"[^>]*rel="noopener noreferrer"[^>]*hidden/.test(HTML) &&
+    /Opens the payment page, then tap Open UPI app\./.test(HTML) &&
+    /wait a minute and refresh, or check the email link/.test(HTML));
   check('backend validates IDs and totals', BACKEND.includes('ORDER_ID_PATTERN') && BACKEND.includes('Number(data.totalPaise) !== totalPaise'));
   check('backend throttles rapid repeat orders', BACKEND.includes('CacheService.getScriptCache') && BACKEND.includes('cache.put(cooldownKey, order.orderId, 15)'));
   const sentEmails = [];

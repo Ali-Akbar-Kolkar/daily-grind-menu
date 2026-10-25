@@ -1000,6 +1000,20 @@ code {
   color: var(--muted);
 }
 
+.pay__payment-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: .25rem;
+}
+
+.pay__payment-note {
+  margin: .45rem 0 .8rem;
+  font-size: .78rem;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
 .upi-payment[hidden],
 .upi-payment__qr[hidden],
 .upi-payment__fallback[hidden] { display: none; }
