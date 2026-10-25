@@ -258,7 +258,8 @@
     'cartClear', 'stepEmail', 'orderForm', 'orderName', 'orderEmail', 'orderPhone',
     'whatsappOptIn', 'orderWebsite',
     'orderSubmit', 'orderStatus', 'stepPay', 'payTotal', 'payId',
-    'payStatus', 'paymentPageLink', 'whatsappOrder', 'upiPayment', 'upiOpen', 'upiQr', 'upiQrFallback',
+    'payStatus', 'paymentPageLink', 'whatsappOrder', 'upiPayment', 'upiOpen', 'upiQrLink', 'upiQr',
+    'upiQrDownload', 'upiQrFallback',
     'upiAmount', 'upiOrderId', 'upiIdText', 'upiCopy', 'upiCopyStatus',
     'orderAgain', 'cartLive', 'profileEdit', 'profileDialog',
     'profileForm', 'profileName', 'profileEmail', 'profileStatus', 'profileSkip',
@@ -864,7 +865,14 @@
       lastUpiLink = '';
       if (dom.upiQr) {
         dom.upiQr.textContent = '';
-        dom.upiQr.hidden = true;
+      }
+      if (dom.upiQrLink) {
+        dom.upiQrLink.hidden = true;
+        dom.upiQrLink.setAttribute('href', '');
+      }
+      if (dom.upiQrDownload) {
+        dom.upiQrDownload.hidden = true;
+        dom.upiQrDownload.setAttribute('href', '');
       }
       if (dom.upiQrFallback) dom.upiQrFallback.hidden = true;
       if (dom.upiOpen) dom.upiOpen.setAttribute('href', '');
@@ -877,6 +885,7 @@
     if (dom.upiAmount) dom.upiAmount.textContent = amount;
     if (dom.upiOrderId) dom.upiOrderId.textContent = order.id;
     if (dom.upiIdText) dom.upiIdText.textContent = upiId;
+    if (dom.upiQrLink) dom.upiQrLink.setAttribute('href', link);
     if (dom.upiQr) dom.upiQr.setAttribute(
       'aria-label',
       'UPI payment QR for order ' + order.id + ', amount ' + amount
@@ -886,8 +895,12 @@
 
     if (dom.upiQr) dom.upiQr.textContent = '';
     if (dom.upiQrFallback) dom.upiQrFallback.hidden = false;
+    if (dom.upiQrLink) dom.upiQrLink.hidden = true;
+    if (dom.upiQrDownload) {
+      dom.upiQrDownload.hidden = true;
+      dom.upiQrDownload.setAttribute('href', '');
+    }
     if (!dom.upiQr || typeof window.qrcode !== 'function') {
-      if (dom.upiQr) dom.upiQr.hidden = true;
       return;
     }
 
@@ -895,11 +908,21 @@
       var qr = window.qrcode(0, 'M');
       qr.addData(link);
       qr.make();
-      dom.upiQr.innerHTML = qr.createSvgTag(5, 2);
-      dom.upiQr.hidden = false;
+      var svg = qr.createSvgTag(5, 2);
+      dom.upiQr.innerHTML = svg;
+      if (dom.upiQrLink) dom.upiQrLink.hidden = false;
+      if (dom.upiQrDownload) {
+        dom.upiQrDownload.setAttribute(
+          'href',
+          'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg)
+        );
+        dom.upiQrDownload.setAttribute('download', 'upi-payment-' + order.id + '.svg');
+        dom.upiQrDownload.hidden = false;
+      }
       if (dom.upiQrFallback) dom.upiQrFallback.hidden = true;
     } catch (error) {
-      dom.upiQr.hidden = true;
+      if (dom.upiQrLink) dom.upiQrLink.hidden = true;
+      if (dom.upiQrDownload) dom.upiQrDownload.hidden = true;
       if (typeof console !== 'undefined' && typeof console.error === 'function') {
         console.error('Could not render the on-page UPI QR:', error);
       }

@@ -106,9 +106,10 @@ Apps Script content responses redirect to a one-time Google-hosted URL and do no
   QR generation runs in the browser; the email QR continues to use the separate
   existing Apps Script QR-image flow.
 - To manually test the on-page payment step, open `index.html?demo=1` on a
-  phone, submit a demo order, and tap **Open UPI app**. To test QR scanning,
-  open the same demo order on one device and scan its QR from a second device.
-  Do not authorize a real payment during this test.
+  phone, submit a demo order, tap **Open UPI app** or the QR, and try **Download
+  QR**. The downloaded SVG contains the same order-specific UPI payment link.
+  To test QR scanning, open the same demo order on one device and scan its QR
+  from a second device. Do not authorize a real payment during this test.
 
 ## Deployment
 

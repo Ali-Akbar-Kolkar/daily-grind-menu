@@ -1015,6 +1015,7 @@ code {
 }
 
 .upi-payment[hidden],
+.upi-payment__qr-link[hidden],
 .upi-payment__qr[hidden],
 .upi-payment__fallback[hidden] { display: none; }
 
@@ -1030,11 +1031,20 @@ code {
   background: var(--card);
 }
 
-.upi-payment__open { order: 0; }
+.upi-payment__qr-link {
+  display: block;
+  width: min(100%, 16rem);
+  border-radius: 10px;
+  text-decoration: none;
+}
+
+.upi-payment__qr-link:focus-visible {
+  outline: 3px solid var(--coffee);
+  outline-offset: 3px;
+}
 
 .upi-payment__qr {
-  order: 1;
-  width: min(100%, 16rem);
+  width: 100%;
   aspect-ratio: 1;
   padding: .5rem;
   border: 1px solid var(--line);
