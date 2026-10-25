@@ -743,6 +743,11 @@ function check(label, condition, detail) {
   };
   const qrImage = {
     getContentType() { return 'image/png'; },
+    getName() { return this.name; },
+    setName(name) { this.name = name; return this; }
+  };
+  const logoImage = {
+    getContentType() { return 'image/png'; },
     setName(name) { this.name = name; return this; }
   };
   const backendContext = vm.createContext({
@@ -766,7 +771,7 @@ function check(label, condition, detail) {
           getResponseCode() {
             return qrServiceFails && !url.includes('Alifivacon.ico.png') ? 503 : 200;
           },
-          getBlob() { return qrImage; }
+          getBlob() { return url.includes('Alifivacon.ico.png') ? logoImage : qrImage; }
         };
       }
     },
@@ -867,12 +872,17 @@ function check(label, condition, detail) {
   const escapedPaymentPageUrl = paymentPageUrl.replace(/&/g, '&amp;');
   check('customer email embeds a QR for the direct UPI URL',
     sentEmails[0].inlineImages.paymentQr === qrImage &&
+    sentEmails[0].attachments[0] === qrImage &&
+    sentEmails[0].attachments[0].name === 'upi-payment-ORD-TEST123.png' &&
     sentEmails[0].htmlBody.includes('src="cid:paymentQr"') &&
+    sentEmails[0].htmlBody.includes('download the attached') &&
+    sentEmails[0].htmlBody.includes('upi-payment-ORD-TEST123.png') &&
+    sentEmails[0].body.includes('Download the attached QR image: upi-payment-ORD-TEST123.png') &&
     sentEmails[0].body.includes('Scan the attached QR code') &&
     qrRequests[1].url.endsWith('data=' + encodeURIComponent(upiUrl)) &&
     qrRequests[1].options.muteHttpExceptions === true);
   check('customer order email includes a linked developer logo and portfolio',
-    sentEmails[0].inlineImages.developerLogo === qrImage &&
+    sentEmails[0].inlineImages.developerLogo === logoImage &&
     sentEmails[0].htmlBody.includes('src="cid:developerLogo"') &&
     sentEmails[0].htmlBody.includes('href="https://ali-akbar-k.github.io/PORTFOLIO/"') &&
     sentEmails[0].body.includes('Portfolio: https://ali-akbar-k.github.io/PORTFOLIO/'));
@@ -886,7 +896,7 @@ function check(label, condition, detail) {
   vm.runInContext("sendCustomerOrderEmail_({ orderId: 'ORD-TEST456', customerName: 'A Customer', customerEmail: 'customer@example.com', itemsText: 'Test item', totalPaise: 575 })", backendContext);
   check('QR service failure is logged and email retains payment fallbacks',
     !sentEmails[1].inlineImages.paymentQr &&
-    sentEmails[1].inlineImages.developerLogo === qrImage &&
+    sentEmails[1].inlineImages.developerLogo === logoImage &&
     sentEmails[1].body.includes('QR image is loaded directly in this email') &&
     sentEmails[1].htmlBody.includes('api.qrserver.com/v1/create-qr-code/') &&
     sentEmails[1].htmlBody.includes('alt="UPI payment QR code"') &&
@@ -910,7 +920,7 @@ function check(label, condition, detail) {
     ownerEmail.body.includes('verify payment in your banking app') &&
     ownerEmail.body.includes(ownerConfirmationUrl));
   check('owner notification includes the linked developer logo',
-    ownerEmail.inlineImages.developerLogo === qrImage &&
+    ownerEmail.inlineImages.developerLogo === logoImage &&
     ownerEmail.htmlBody.includes('src="cid:developerLogo"') &&
     ownerEmail.body.includes('Portfolio: https://ali-akbar-k.github.io/PORTFOLIO/'));
   vm.runInContext(
@@ -919,7 +929,7 @@ function check(label, condition, detail) {
   );
   const confirmationEmail = sentEmails[sentEmails.length - 1];
   check('payment confirmation email includes the linked developer logo',
-    confirmationEmail.inlineImages.developerLogo === qrImage &&
+    confirmationEmail.inlineImages.developerLogo === logoImage &&
     confirmationEmail.htmlBody.includes('href="https://ali-akbar-k.github.io/PORTFOLIO/"') &&
     confirmationEmail.htmlBody.includes('src="cid:developerLogo"') &&
     confirmationEmail.body.includes('Portfolio: https://ali-akbar-k.github.io/PORTFOLIO/'));
