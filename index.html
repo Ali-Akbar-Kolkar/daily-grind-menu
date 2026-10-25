@@ -91,7 +91,7 @@
     <p>Prices include tax. Ask about allergens before ordering.</p>
     <button type="button" id="refresh" class="btn btn--ghost" hidden>Refresh menu</button>
     <p class="footer__credit">Photos come from the <code>Image</code> or <code>Image URL</code> column of the published Google Sheet. Card photos that fail are listed in the browser console. The cafe emails payment instructions after receiving an order and can send WhatsApp updates when customers opt in; this page never takes payment.</p>
-    <p class="footer__credit">Copyright &copy;<script>document.write(new Date().getFullYear());</script> All rights reserved | This template is made with <span aria-hidden="true">&hearts;</span> by <a href="https://ali-akbar-k.github.io/PORTFOLIO/" target="_blank" rel="noopener noreferrer">Ali-Akbar-K</a></p>
+    <p class="footer__credit">Copyright &copy;<script>document.write(new Date().getFullYear());</script> All rights reserved | Developed by <a href="https://ali-akbar-k.github.io/PORTFOLIO/" target="_blank" rel="noopener noreferrer">Ali-Akbar-K</a></p>
   </footer>
 
 </div>
@@ -178,30 +178,27 @@
           <p class="pay__label">Payment pending</p>
           <p id="payTotal" class="pay__amount"></p>
           <p class="pay__order">Order <span id="payId"></span></p>
-          <a id="paymentPageLink" class="btn btn--wide pay__payment-link" href="" target="_blank" rel="noopener noreferrer" hidden>Pay with UPI</a>
-          <p class="pay__hint">Opens the payment page, then tap Open UPI app.</p>
-          <p class="pay__payment-note">The payment page looks up the order and amount in the cafe's records. If it says the order was not found, wait a minute and refresh, or check the email link. The email remains the confirmation of record.</p>
+          <p class="pay__hint">Scan the QR with another device, or open your UPI app.</p>
           <div id="upiPayment" class="upi-payment" hidden>
             <a id="upiOpen" class="btn btn--wide upi-payment__open" href="">Open UPI app</a>
-            <a id="upiQrLink" class="upi-payment__qr-link" href="" aria-label="Open this payment in a UPI app" hidden>
+            <div id="upiQrDisplay" class="upi-payment__qr-display" hidden>
               <div id="upiQr" class="upi-payment__qr" role="img"></div>
-            </a>
+            </div>
             <a id="upiQrDownload" class="btn btn--ghost upi-payment__download" href="" download hidden>Download QR (JPG)</a>
             <p id="upiQrDownloadStatus" class="upi-payment__fallback" role="status" hidden></p>
             <p id="upiQrFallback" class="upi-payment__fallback" hidden>QR preview is unavailable. Use Open UPI app or copy the UPI ID below.</p>
-            <p class="upi-payment__detail">Amount: <strong id="upiAmount"></strong></p>
-            <p class="upi-payment__detail">Order reference: <strong id="upiOrderId"></strong></p>
             <p class="upi-payment__detail">UPI ID: <strong id="upiIdText"></strong></p>
             <button id="upiCopy" class="btn btn--ghost" type="button">Copy UPI ID</button>
             <p id="upiCopyStatus" class="note" role="status" aria-live="polite" hidden></p>
-            <p class="upi-payment__hint">Tap the QR to open your UPI app, or scan it from another device. You can also save the QR as a JPG. Pay the exact amount and keep the order ID as the reference.</p>
-            <p class="upi-payment__caveat">This amount comes from the order submitted in this browser; the cafe will verify it against its bank app. Because this page cannot confirm Apps Script acceptance, wait for the order email. The cafe's email remains the confirmation of record.</p>
+            <p class="upi-payment__caveat">Pay the amount shown above and use the order ID as reference. The cafe confirms payment by email.</p>
           </div>
+          <a id="paymentPageLink" class="pay__payment-link" href="" target="_blank" rel="noopener noreferrer" hidden>Having trouble? Open payment page</a>
           <a id="whatsappOrder" class="btn btn--wide pay__whatsapp" href="" target="_blank" rel="noopener noreferrer" hidden>Send order on WhatsApp</a>
-          <p class="pay__whatsapp-note">Optional: message the cafe on WhatsApp. Tap Send to share your order. This message also serves as a backup confirmation the cafe will see; it does not confirm that the cafe has accepted your order.</p>
-          <p class="pay__verify">Pay the cafe directly in your UPI app. The cafe checks its bank app and emails you after confirming payment, and sends a WhatsApp update if you opted in. Starting another order will not cancel this one; contact the cafe if you need to cancel it.</p>
+          <p class="pay__whatsapp-note">Optional: send your order to the cafe on WhatsApp.</p>
+          <p class="pay__verify">Only the cafe’s email confirms payment. Contact the cafe if you need to cancel.</p>
 
           <p id="payStatus" class="note" role="status" hidden></p>
+          <p class="pay__developer">Developed by <a href="https://ali-akbar-k.github.io/PORTFOLIO/" target="_blank" rel="noopener noreferrer">Ali-Akbar-K</a></p>
 
           <div class="cart__actions">
             <button type="button" id="orderAgain" class="btn btn--ghost" hidden>Start a new order</button>

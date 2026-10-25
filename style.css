@@ -994,28 +994,21 @@ code {
 }
 
 .pay__order {
-  margin: .15rem 0 1rem;
+  margin: .15rem 0 .55rem;
   font-family: var(--mono);
   font-size: .78rem;
   color: var(--muted);
 }
 
 .pay__payment-link {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  margin-top: .25rem;
-}
-
-.pay__payment-note {
-  margin: .45rem 0 .8rem;
-  font-size: .78rem;
-  line-height: 1.5;
-  color: var(--muted);
+  display: inline-block;
+  margin: .2rem 0 .4rem;
+  font-size: .8rem;
+  color: var(--coffee);
 }
 
 .upi-payment[hidden],
-.upi-payment__qr-link[hidden],
+.upi-payment__qr-display[hidden],
 .upi-payment__qr[hidden],
 .upi-payment__fallback[hidden] { display: none; }
 
@@ -1023,24 +1016,18 @@ code {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: .45rem;
-  margin: 1rem 0;
-  padding: 1rem;
+  gap: .35rem;
+  margin: .65rem 0;
+  padding: .75rem;
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--card);
 }
 
-.upi-payment__qr-link {
+.upi-payment__qr-display {
   display: block;
   width: min(100%, 16rem);
   border-radius: 10px;
-  text-decoration: none;
-}
-
-.upi-payment__qr-link:focus-visible {
-  outline: 3px solid var(--coffee);
-  outline-offset: 3px;
 }
 
 .upi-payment__qr {
@@ -1085,8 +1072,8 @@ code {
 .upi-payment .note { margin: .25rem 0 0; }
 
 .pay__hint {
-  margin: .65rem 0 0;
-  font-size: .9rem;
+  margin: .35rem 0 0;
+  font-size: .82rem;
   font-weight: 700;
   color: var(--coffee);
 }
@@ -1106,11 +1093,19 @@ code {
 }
 
 .pay__verify {
-  margin: .9rem 0 0;
-  font-size: .78rem;
-  line-height: 1.5;
+  margin: .5rem 0 0;
+  font-size: .75rem;
+  line-height: 1.45;
   color: var(--muted);
 }
+
+.pay__developer {
+  margin: .8rem 0 0;
+  font-size: .7rem;
+  color: var(--muted);
+}
+
+.pay__developer a { color: inherit; }
 
 /* ---------- footer ---------- */
 

@@ -56,7 +56,7 @@ PapaParse is loaded from jsDelivr. There is no build step, npm install, or lockf
 1. On the first visit, the customer can save their name and email in that browser for faster checkout later, or continue without saving. Saved details can be edited or forgotten at any time. The customer then adds items and submits the cart.
 2. The browser posts the order to Apps Script using a stable order ID so a retry cannot create a duplicate row.
 3. Apps Script writes the order to the separate `Orders` sheet, emails the customer a **Pay with UPI** HTTPS button, and emails the cafe an order notification. The payment-pending step builds the same payment-page URL using only the stable order ID: `?action=pay&orderId=...`. That page reads the payment amount from the `Orders` sheet and the UPI ID from Apps Script configuration; the browser does not put a customer-editable amount or UPI ID in this payment-page URL. The existing optional local QR/direct UPI link remains available. After submission, the customer can tap **Send order on WhatsApp** to open a prefilled `wa.me` message; the customer must tap **Send** in WhatsApp. This click-to-chat option uses no WhatsApp API or paid service. Set `CAFE_ORDER.whatsappNumber` in `site-config.js` to the cafe's phone number using digits only, including country code and without `+` (for example, `919876543210`); leave it empty to hide the button.
-4. The customer taps **Pay with UPI**, then **Open UPI app** on the payment page. The page looks up the order by its ID and does not accept an amount from the URL. If the order is not found—such as during a brief delay while Apps Script writes it—wait a minute and refresh, or use the payment link in the email. The email remains the confirmation of record because the browser cannot read the `no-cors` submission response. Customers can also scan the existing on-page QR from another device; the cafe must verify the payee and amount in its bank app before confirming.
+4. The customer can tap **Open UPI app**, or scan the display-only on-page QR from another device. The **Having trouble? Open payment page** link is available as a fallback; it looks up the order by its ID and does not accept an amount from the URL. If the order is not found—such as during a brief delay while Apps Script writes it—wait a minute and refresh, or use the payment link in the email. The email remains the confirmation of record because the browser cannot read the `no-cors` submission response.
 5. After checking the bank app, the owner opens the email link and presses **Confirm payment received**. Apps Script updates the order and emails the customer. For the free click-to-chat flow, the owner replies manually from the WhatsApp Business app with payment details and later confirms payment there. The customer's message opens WhatsApp's 24-hour service window, during which the cafe can reply manually at no charge; the cafe does not send messages automatically through the website.
 
 `CAFE_ORDER.upiId` and `CAFE_ORDER.payeeName` in `site-config.js` control the optional browser QR. Keep the UPI ID synchronized with Apps Script's `CONFIG.UPI_ID`. The payment-page URL contains only the order ID; the page uses the sheet total and configured UPI ID. The optional browser QR amount is calculated from the browser's order and is not trusted payment evidence; the cafe must compare it with the bank app before confirming.
@@ -106,9 +106,9 @@ Apps Script content responses redirect to a one-time Google-hosted URL and do no
   QR generation runs in the browser; the email QR continues to use the separate
   existing Apps Script QR-image flow.
 - To manually test the on-page payment step, open `index.html?demo=1` on a
-  phone, submit a demo order, tap **Open UPI app** or the QR, and try **Download
-  QR (JPG)**. The downloaded JPG contains the same order-specific UPI payment
-  link.
+  phone, submit a demo order, confirm the QR is display-only, tap **Open UPI app**
+  and try **Download QR (JPG)**. The downloaded JPG contains the same
+  order-specific UPI payment link.
   To test QR scanning, open the same demo order on one device and scan its QR
   from a second device. Do not authorize a real payment during this test.
 

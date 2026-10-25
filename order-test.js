@@ -13,7 +13,7 @@ const IDS = [
   'stepEmail', 'orderForm', 'orderName', 'orderEmail', 'orderWebsite', 'orderSubmit',
   'orderPhone', 'whatsappOptIn',
   'orderStatus', 'stepPay', 'payTotal', 'payId', 'payStatus', 'paymentPageLink', 'whatsappOrder',
-  'upiPayment', 'upiOpen', 'upiQrLink', 'upiQr', 'upiQrDownload', 'upiQrDownloadStatus',
+  'upiPayment', 'upiOpen', 'upiQrDisplay', 'upiQr', 'upiQrDownload', 'upiQrDownloadStatus',
   'upiQrFallback', 'upiAmount', 'upiOrderId',
   'upiIdText', 'upiCopy', 'upiCopyStatus', 'orderAgain', 'cartLive',
   'profileEdit', 'profileDialog', 'profileForm', 'profileName', 'profileEmail',
@@ -152,10 +152,10 @@ function buildDom() {
     ['stepEmail', ['orderForm', 'orderStatus']],
     ['stepPay', ['payTotal', 'payId', 'payStatus', 'paymentPageLink', 'whatsappOrder', 'upiPayment', 'orderAgain']]
   ].forEach(([parent, children]) => children.forEach((id) => byId[parent].appendChild(byId[id])));
-  ['upiOpen', 'upiQrLink', 'upiQrDownload', 'upiQrDownloadStatus', 'upiQrFallback', 'upiAmount',
+  ['upiOpen', 'upiQrDisplay', 'upiQrDownload', 'upiQrDownloadStatus', 'upiQrFallback', 'upiAmount',
     'upiOrderId', 'upiIdText', 'upiCopy', 'upiCopyStatus']
     .forEach((id) => byId.upiPayment.appendChild(byId[id]));
-  byId.upiQrLink.appendChild(byId.upiQr);
+  byId.upiQrDisplay.appendChild(byId.upiQr);
   ['orderName', 'orderEmail', 'orderPhone', 'whatsappOptIn', 'orderWebsite', 'orderSubmit']
     .forEach((id) => byId.orderForm.appendChild(byId[id]));
   ['profileName', 'profileEmail', 'profileStatus', 'profileSkip', 'profileForget'].forEach((id) => byId.profileForm.appendChild(byId[id]));
@@ -346,7 +346,7 @@ function check(label, condition, detail) {
   check('payload includes a retry-safe order ID', payload.orderId === cart.order.order().id && /^ORD-/.test(payload.orderId));
   check('order moves to payment pending', cart.order.phase() === 'awaiting-payment');
   check('total and order ID remain visible', cart.dom.payTotal.textContent === '₹12.75' && cart.dom.payId.textContent === payload.orderId);
-  check('Pay with UPI opens the matching Apps Script payment page',
+  check('payment-page fallback opens the matching Apps Script payment page',
     cart.dom.paymentPageLink.hidden === false &&
     cart.dom.paymentPageLink.getAttribute('href') === CONFIG.appsScriptUrl +
       '?action=pay&orderId=' + encodeURIComponent(payload.orderId));
@@ -354,8 +354,7 @@ function check(label, condition, detail) {
   check('on-page UPI QR appears with order-specific payment details',
     cart.dom.upiPayment.hidden === false &&
     cart.dom.upiOpen.getAttribute('href').startsWith('upi://pay?') &&
-    cart.dom.upiQrLink.hidden === false &&
-    cart.dom.upiQrLink.getAttribute('href') === cart.dom.upiOpen.getAttribute('href') &&
+    cart.dom.upiQrDisplay.hidden === false &&
     cart.dom.upiQr.innerHTML.includes('<svg') &&
     cart.dom.upiQr.getAttribute('aria-label').includes(payload.orderId) &&
     cart.dom.upiQrDownload.hidden === false &&
@@ -382,8 +381,7 @@ function check(label, condition, detail) {
   check('UPI QR block is restored for a pending order',
     pendingResume.dom.upiPayment.hidden === false &&
     pendingResume.dom.upiOpen.getAttribute('href') === cart.dom.upiOpen.getAttribute('href') &&
-    pendingResume.dom.upiQrLink.hidden === false &&
-    pendingResume.dom.upiQrLink.getAttribute('href') === cart.dom.upiQrLink.getAttribute('href') &&
+    pendingResume.dom.upiQrDisplay.hidden === false &&
     pendingResume.dom.upiQrDownload.hidden === false);
   check('WhatsApp button href is restored for a pending order',
     pendingResume.dom.whatsappOrder.hidden === false &&
@@ -396,7 +394,7 @@ function check(label, condition, detail) {
   check('starting a new order unlocks menu items', pendingResume.order.phase() === 'cart' && pendingResume.dom.cartBar.hidden === true);
   check('starting a new order clears the UPI payment block',
     pendingResume.dom.upiPayment.hidden === true &&
-    pendingResume.dom.upiQrLink.hidden === true &&
+    pendingResume.dom.upiQrDisplay.hidden === true &&
     pendingResume.dom.upiQrDownload.hidden === true &&
     pendingResume.dom.upiOpen.getAttribute('href') === '');
   check('starting a new order clears the payment page link',
@@ -593,7 +591,7 @@ function check(label, condition, detail) {
   await noQrLibrary.order.submitOrder({ preventDefault() {} });
   check('QR library failure keeps UPI app button and ID available',
     noQrLibrary.dom.upiPayment.hidden === false &&
-    noQrLibrary.dom.upiQrLink.hidden === true &&
+    noQrLibrary.dom.upiQrDisplay.hidden === true &&
     noQrLibrary.dom.upiQrDownload.hidden === true &&
     noQrLibrary.dom.upiQrFallback.hidden === false &&
     noQrLibrary.dom.upiOpen.getAttribute('href').startsWith('upi://pay?') &&
@@ -605,7 +603,7 @@ function check(label, condition, detail) {
   noJpegSupport.dom.orderEmail.value = 'customer@example.com';
   await noJpegSupport.order.submitOrder({ preventDefault() {} });
   check('JPEG conversion failure keeps the QR visible and explains the fallback',
-    noJpegSupport.dom.upiQrLink.hidden === false &&
+    noJpegSupport.dom.upiQrDisplay.hidden === false &&
     noJpegSupport.dom.upiQrDownload.hidden === true &&
     noJpegSupport.dom.upiQrDownloadStatus.hidden === false &&
     /could not prepare a JPG/i.test(noJpegSupport.dom.upiQrDownloadStatus.textContent) &&
@@ -618,7 +616,7 @@ function check(label, condition, detail) {
   await noUpiConfig.order.submitOrder({ preventDefault() {} });
   check('missing UPI ID leaves the QR block hidden after order submission',
     noUpiConfig.dom.upiPayment.hidden === true &&
-    noUpiConfig.dom.upiQrLink.hidden === true &&
+    noUpiConfig.dom.upiQrDisplay.hidden === true &&
     noUpiConfig.dom.upiQrDownload.hidden === true);
 
   check('WhatsApp button href is set after submission',
@@ -655,21 +653,23 @@ function check(label, condition, detail) {
     /src="submit-order\.js"/.test(HTML) && /id="orderName"/.test(HTML) &&
     /id="orderPhone"/.test(HTML) && /id="whatsappOptIn"/.test(HTML) &&
     /id="profileDialog"/.test(HTML) && /id="profileEdit"/.test(HTML));
-  check('payment QR is a UPI app link with a local JPG download',
-    /id="upiQrLink"[^>]*href=""[^>]*hidden/.test(HTML) &&
+  check('payment QR is static and has a local JPG download',
+    /<div id="upiQrDisplay"[^>]*hidden>/.test(HTML) &&
+    !/<a id="upiQr(Link|Display)"/.test(HTML) &&
     /id="upiQrDownload"[^>]*download[^>]*hidden>Download QR \(JPG\)<\/a>/.test(HTML) &&
-    /Tap the QR to open your UPI app/.test(HTML));
+    /Scan the QR with another device/.test(HTML));
   check('pinned QR library loads before order.js',
     HTML.indexOf('https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js') !== -1 &&
     HTML.indexOf('qrcode-generator/1.4.4/qrcode.min.js') < HTML.indexOf('src="order.js"'));
   check('WhatsApp link opens safely and explains the manual backup confirmation',
     /id="whatsappOrder"[^>]*target="_blank"[^>]*rel="noopener noreferrer"[^>]*hidden/.test(HTML) &&
-    /Optional: message the cafe on WhatsApp\./.test(HTML) &&
-    /backup confirmation the cafe will see/.test(HTML));
-  check('payment page button opens safely and explains the not-found retry',
+    /Optional: send your order to the cafe on WhatsApp\./.test(HTML));
+  check('payment page fallback link opens safely',
     /id="paymentPageLink"[^>]*target="_blank"[^>]*rel="noopener noreferrer"[^>]*hidden/.test(HTML) &&
-    /Opens the payment page, then tap Open UPI app\./.test(HTML) &&
-    /wait a minute and refresh, or check the email link/.test(HTML));
+    /Having trouble\? Open payment page/.test(HTML) &&
+    !/id="paymentPageLink"[^>]*class="btn/.test(HTML));
+  check('developer credit appears on menu and payment screens',
+    (HTML.match(/Developed by <a href="https:\/\/ali-akbar-k\.github\.io\/PORTFOLIO\/"/g) || []).length === 2);
   check('backend validates IDs and totals', BACKEND.includes('ORDER_ID_PATTERN') && BACKEND.includes('Number(data.totalPaise) !== totalPaise'));
   check('backend throttles rapid repeat orders', BACKEND.includes('CacheService.getScriptCache') && BACKEND.includes('cache.put(cooldownKey, order.orderId, 15)'));
   const sentEmails = [];

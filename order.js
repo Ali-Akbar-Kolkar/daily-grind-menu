@@ -258,7 +258,7 @@
     'cartClear', 'stepEmail', 'orderForm', 'orderName', 'orderEmail', 'orderPhone',
     'whatsappOptIn', 'orderWebsite',
     'orderSubmit', 'orderStatus', 'stepPay', 'payTotal', 'payId',
-    'payStatus', 'paymentPageLink', 'whatsappOrder', 'upiPayment', 'upiOpen', 'upiQrLink', 'upiQr',
+    'payStatus', 'paymentPageLink', 'whatsappOrder', 'upiPayment', 'upiOpen', 'upiQrDisplay', 'upiQr',
     'upiQrDownload', 'upiQrDownloadStatus', 'upiQrFallback',
     'upiAmount', 'upiOrderId', 'upiIdText', 'upiCopy', 'upiCopyStatus',
     'orderAgain', 'cartLive', 'profileEdit', 'profileDialog',
@@ -859,7 +859,7 @@
   function reportQrDownloadError(error) {
     if (dom.upiQrDownloadStatus) {
       dom.upiQrDownloadStatus.textContent =
-        'Could not prepare a JPG on this device. You can still tap or scan the QR above.';
+        'Could not prepare a JPG on this device. You can still scan the QR above or open your UPI app.';
       dom.upiQrDownloadStatus.hidden = false;
     }
     if (typeof console !== 'undefined' && typeof console.error === 'function') {
@@ -918,10 +918,7 @@
       if (dom.upiQr) {
         dom.upiQr.textContent = '';
       }
-      if (dom.upiQrLink) {
-        dom.upiQrLink.hidden = true;
-        dom.upiQrLink.setAttribute('href', '');
-      }
+      if (dom.upiQrDisplay) dom.upiQrDisplay.hidden = true;
       if (dom.upiQrDownload) {
         dom.upiQrDownload.hidden = true;
         dom.upiQrDownload.setAttribute('href', '');
@@ -938,7 +935,6 @@
     if (dom.upiAmount) dom.upiAmount.textContent = amount;
     if (dom.upiOrderId) dom.upiOrderId.textContent = order.id;
     if (dom.upiIdText) dom.upiIdText.textContent = upiId;
-    if (dom.upiQrLink) dom.upiQrLink.setAttribute('href', link);
     if (dom.upiQr) dom.upiQr.setAttribute(
       'aria-label',
       'UPI payment QR for order ' + order.id + ', amount ' + amount
@@ -948,7 +944,7 @@
 
     if (dom.upiQr) dom.upiQr.textContent = '';
     if (dom.upiQrFallback) dom.upiQrFallback.hidden = false;
-    if (dom.upiQrLink) dom.upiQrLink.hidden = true;
+    if (dom.upiQrDisplay) dom.upiQrDisplay.hidden = true;
     if (dom.upiQrDownload) {
       dom.upiQrDownload.hidden = true;
       dom.upiQrDownload.setAttribute('href', '');
@@ -964,11 +960,11 @@
       qr.make();
       var svg = qr.createSvgTag(5, 2);
       dom.upiQr.innerHTML = svg;
-      if (dom.upiQrLink) dom.upiQrLink.hidden = false;
+      if (dom.upiQrDisplay) dom.upiQrDisplay.hidden = false;
       prepareQrJpegDownload(svg, order.id, link);
       if (dom.upiQrFallback) dom.upiQrFallback.hidden = true;
     } catch (error) {
-      if (dom.upiQrLink) dom.upiQrLink.hidden = true;
+      if (dom.upiQrDisplay) dom.upiQrDisplay.hidden = true;
       if (dom.upiQrDownload) dom.upiQrDownload.hidden = true;
       if (typeof console !== 'undefined' && typeof console.error === 'function') {
         console.error('Could not render the on-page UPI QR:', error);
