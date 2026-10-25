@@ -153,6 +153,14 @@
     return /^\+[1-9]\d{7,14}$/.test(String(value == null ? '' : value).trim());
   }
 
+  function normalizePhone(value) {
+    var phone = String(value == null ? '' : value).trim().replace(/[\s().-]/g, '');
+    if (/^\d{10}$/.test(phone)) phone = '+91' + phone;
+    else if (/^0\d{10}$/.test(phone)) phone = '+91' + phone.slice(1);
+    else if (/^91\d{10}$/.test(phone)) phone = '+' + phone;
+    return isWhatsAppPhone(phone) ? phone : '';
+  }
+
   var ALPHABET = '0123456789ABCDEFGHJKLMNPQRSTUVWXYZ';
 
   function randomChunk(length) {
@@ -263,7 +271,7 @@
     'upiAmount', 'upiOrderId', 'upiIdText', 'upiCopy', 'upiCopyStatus',
     'orderAgain', 'cartLive', 'profileEdit', 'profileDialog',
     'profileForm', 'profileName', 'profileEmail', 'profileStatus', 'profileSkip',
-    'profileForget'
+    'profilePhone', 'profileForget'
   ];
 
   var dom = {};
@@ -422,8 +430,10 @@
       var saved = JSON.parse(raw);
       var name = String(saved && saved.name || '').trim();
       var email = String(saved && saved.email || '').trim();
+      var phone = saved && saved.phone ? normalizePhone(saved.phone) : '';
       if (!name || name.length > 100 || !isEmail(email)) throw new Error('Invalid saved customer details.');
-      customerProfile = { name: name, email: email };
+      if (saved.phone && !phone) throw new Error('Invalid saved customer phone number.');
+      customerProfile = { name: name, email: email, phone: phone };
     } catch (err) {
       try {
         store.removeItem(PROFILE_STORAGE_KEY);
@@ -433,15 +443,16 @@
     }
   }
 
-  function saveCustomerProfile(nameValue, emailValue) {
+  function saveCustomerProfile(nameValue, emailValue, phoneValue) {
     var name = String(nameValue || '').trim();
     var email = String(emailValue || '').trim();
-    if (!name || name.length > 100 || !isEmail(email)) return false;
+    var phone = normalizePhone(phoneValue);
+    if (!name || name.length > 100 || !isEmail(email) || !phone) return false;
     var store = storage();
     if (!store) return false;
     try {
-      store.setItem(PROFILE_STORAGE_KEY, JSON.stringify({ name: name, email: email }));
-      customerProfile = { name: name, email: email };
+      store.setItem(PROFILE_STORAGE_KEY, JSON.stringify({ name: name, email: email, phone: phone }));
+      customerProfile = { name: name, email: email, phone: phone };
       return true;
     } catch (err) {
       storageOk = false;
@@ -453,12 +464,16 @@
     if (!customerProfile) return;
     if (dom.orderName) dom.orderName.value = customerProfile.name;
     if (dom.orderEmail) dom.orderEmail.value = customerProfile.email;
+    if (dom.orderPhone) dom.orderPhone.value = customerProfile.phone || '+91 ';
   }
 
   function openProfileDialog() {
     if (!dom.profileDialog || typeof dom.profileDialog.showModal !== 'function') return;
     if (dom.profileName) dom.profileName.value = customerProfile ? customerProfile.name : '';
     if (dom.profileEmail) dom.profileEmail.value = customerProfile ? customerProfile.email : '';
+    if (dom.profilePhone) dom.profilePhone.value = customerProfile && customerProfile.phone
+      ? customerProfile.phone
+      : '+91 ';
     if (dom.profileForget) dom.profileForget.hidden = !customerProfile;
     if (dom.profileSkip) dom.profileSkip.textContent = customerProfile ? 'Cancel' : 'Continue without saving';
     say(dom.profileStatus, '', null);
@@ -470,6 +485,7 @@
     if (event && typeof event.preventDefault === 'function') event.preventDefault();
     var name = String((dom.profileName && dom.profileName.value) || '').trim();
     var email = String((dom.profileEmail && dom.profileEmail.value) || '').trim();
+    var phone = normalizePhone((dom.profilePhone && dom.profilePhone.value) || '');
     if (!name || name.length > 100) {
       say(dom.profileStatus, 'Enter your name (up to 100 characters).', 'warn');
       if (dom.profileName) dom.profileName.focus();
@@ -480,7 +496,12 @@
       if (dom.profileEmail) dom.profileEmail.focus();
       return;
     }
-    if (!saveCustomerProfile(name, email)) {
+    if (!phone) {
+      say(dom.profileStatus, 'Enter a valid mobile number, including the +91 country code.', 'warn');
+      if (dom.profilePhone) dom.profilePhone.focus();
+      return;
+    }
+    if (!saveCustomerProfile(name, email, phone)) {
       say(dom.profileStatus, 'These details could not be saved in this browser. You can continue without saving and enter them at checkout.', 'warn');
       return;
     }
@@ -505,6 +526,9 @@
     customerProfile = null;
     if (dom.orderName) dom.orderName.value = order ? order.customerName || '' : '';
     if (dom.orderEmail) dom.orderEmail.value = order ? order.email : '';
+    if (dom.orderPhone) dom.orderPhone.value = order && order.phone
+      ? order.phone
+      : '+91 ';
     if (dom.profileEdit) dom.profileEdit.textContent = 'Save my details';
     if (dom.profileDialog) dom.profileDialog.close();
   }
@@ -1190,7 +1214,7 @@
     var email = String((dom.orderEmail && dom.orderEmail.value) || '').trim();
     var whatsappOptIn = Boolean(dom.whatsappOptIn && dom.whatsappOptIn.checked);
     var phone = whatsappOptIn
-      ? String((dom.orderPhone && dom.orderPhone.value) || '').trim()
+      ? normalizePhone((dom.orderPhone && dom.orderPhone.value) || '')
       : '';
 
     /* checked before the empty-cart case, so an item the cafe removed is not
@@ -1222,7 +1246,9 @@
       return;
     }
     if (whatsappOptIn && !isWhatsAppPhone(phone)) {
-      say(dom.orderStatus, 'Enter your WhatsApp number in international format before opting in.', 'warn');
+      say(dom.orderStatus,
+        'Enter a valid mobile number with country code (for example, +91 9876543210) before opting in.',
+        'warn');
       render();
       if (dom.orderPhone && typeof dom.orderPhone.focus === 'function') dom.orderPhone.focus();
       return;
@@ -1275,9 +1301,10 @@
   function startNewOrder() {
     resetOrder();
     clearStorage();
-    if (dom.orderName) dom.orderName.value = customerProfile ? customerProfile.name : '';
-    if (dom.orderEmail) dom.orderEmail.value = customerProfile ? customerProfile.email : '';
-    if (dom.orderPhone) dom.orderPhone.value = '';
+    fillCheckoutProfile();
+    if (dom.orderName && !customerProfile) dom.orderName.value = '';
+    if (dom.orderEmail && !customerProfile) dom.orderEmail.value = '';
+    if (dom.orderPhone && !customerProfile) dom.orderPhone.value = '+91 ';
     if (dom.whatsappOptIn) dom.whatsappOptIn.checked = false;
     if (dom.orderWebsite) dom.orderWebsite.value = '';
     say(dom.payStatus, '', null);
@@ -1393,12 +1420,14 @@
       showStep('email');
       if (dom.orderName) dom.orderName.value = order.customerName || '';
       if (dom.orderEmail) dom.orderEmail.value = order.email;
-      if (dom.orderPhone) dom.orderPhone.value = order.phone || '';
+      if (dom.orderPhone) dom.orderPhone.value = order.phone ||
+        (customerProfile && customerProfile.phone) || '+91 ';
       if (dom.whatsappOptIn) dom.whatsappOptIn.checked = Boolean(order.whatsappOptIn);
       say(dom.orderStatus, 'The last request may not have reached the cafe. Retry to use the same order ID, or start a new order.', 'warn');
     }
     render();
-    if (!customerProfile && !order && dom.profileDialog && typeof dom.profileDialog.showModal === 'function') {
+    if ((!customerProfile || (!customerProfile.phone && !order)) &&
+        dom.profileDialog && typeof dom.profileDialog.showModal === 'function') {
       openProfileDialog();
     }
   }
@@ -1418,6 +1447,7 @@
     itemKey: itemKey,
     isEmail: isEmail,
     isWhatsAppPhone: isWhatsAppPhone,
+    normalizePhone: normalizePhone,
     makeOrderId: makeOrderId,
     lineText: lineText,
     orderLinesText: orderLinesText,

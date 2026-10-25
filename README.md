@@ -9,7 +9,7 @@ A digital cafe menu that helps reduce repeated paper printing and plastic menu s
 1. Cafe staff update the menu in the Google Sheet.
 2. The published sheet feeds the live menu webpage.
 3. Customers scan the cafe's QR code and view the menu on their phones. No app download is required.
-4. Customers send an order with their name and email. The cafe emails UPI payment details, and customers may opt in to receive order and payment updates on WhatsApp. The cafe confirms payment after checking its bank app.
+4. Customers send an order with their name and email. They can save their name, email, and mobile number in the current browser for faster checkout; WhatsApp updates remain opt-in. The cafe emails UPI payment details and confirms payment after checking its bank app.
 
 The menu is publicly viewable. Only people authorized by the cafe can edit the Google Sheet.
 
@@ -53,7 +53,7 @@ still renders and checkout explains that orders are unavailable.
 PapaParse is loaded from jsDelivr. There is no build step, npm install, or lockfile.
 ## Ordering: Apps Script and UPI
 
-1. On the first visit, the customer can save their name and email in that browser for faster checkout later, or continue without saving. Saved details can be edited or forgotten at any time. The customer then adds items and submits the cart.
+1. On the first visit, the customer can save their name, email, and mobile number in that browser for faster checkout later, or continue without saving. Indian 10-digit mobile numbers are saved with the default +91 country code. Saved details can be edited or forgotten at any time. The customer then adds items and submits the cart.
 2. The browser posts the order to Apps Script using a stable order ID so a retry cannot create a duplicate row.
 3. Apps Script writes the order to the separate `Orders` sheet, emails the customer a **Pay with UPI** HTTPS button, and emails the cafe an order notification. The payment-pending step builds the same payment-page URL using only the stable order ID: `?action=pay&orderId=...`. That page reads the payment amount from the `Orders` sheet and the UPI ID from Apps Script configuration; the browser does not put a customer-editable amount or UPI ID in this payment-page URL. The existing optional local QR/direct UPI link remains available. After submission, the customer can tap **Send order on WhatsApp** to open a prefilled `wa.me` message; the customer must tap **Send** in WhatsApp. This click-to-chat option uses no WhatsApp API or paid service. Set `CAFE_ORDER.whatsappNumber` in `site-config.js` to the cafe's phone number using digits only, including country code and without `+` (for example, `919876543210`); leave it empty to hide the button.
 4. The customer can tap **Open UPI app**, or scan the display-only on-page QR from another device. The **Having trouble? Open payment page** link is available as a fallback; it looks up the order by its ID and does not accept an amount from the URL. If the order is not found—such as during a brief delay while Apps Script writes it—wait a minute and refresh, or use the payment link in the email. The email remains the confirmation of record because the browser cannot read the `no-cors` submission response.
@@ -63,7 +63,7 @@ PapaParse is loaded from jsDelivr. There is no build step, npm install, or lockf
 
 There is no EmailJS integration. The Apps Script Web App URL, public WhatsApp click-to-chat number, public UPI ID, and payee name are configured in `site-config.js`; the private Sheet ID and owner email are configured in Apps Script. Keep the UPI ID in sync with the backend's configured UPI ID. The existing WhatsApp opt-in/API fields remain separate from the free click-to-chat button. Copy-paste owner responses are in [OWNER-REPLY-TEMPLATES.md](OWNER-REPLY-TEMPLATES.md). Follow [the backend setup guide](payment-backend/README.md) only if using the optional API-based notifications.
 
-Customer name and email are stored only in the browser's `localStorage` under a separate profile key; cart resets do not remove them. They are not sent to the server until an order is submitted. The configured cafe click-to-chat number is public by design. The separate WhatsApp API number entered by a customer is not saved in the profile, but is retained with a pending order on the device so a retry can use the same order ID. API-based WhatsApp messages are sent only when the customer explicitly opts in. The click-to-chat message is only shared if the customer chooses **Send** in WhatsApp. Do not save details on a shared browser if other users may access it.
+Customer name, email, and mobile number are stored only in the browser's `localStorage` under a separate profile key; cart resets do not remove them. They are not sent to the server until an order is submitted. A customer mobile number is sent with an order only if the customer explicitly opts in to WhatsApp updates; otherwise, the phone number is omitted. The configured cafe click-to-chat number is public by design. The customer number is retained with a pending opted-in order on the device so a retry can use the same order ID. The click-to-chat message is only shared if the customer chooses **Send** in WhatsApp. Do not save details on a shared browser if other users may access it.
 
 ### Browser response behavior
 

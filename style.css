@@ -117,7 +117,11 @@ code {
 
 .profile-dialog::backdrop { background: rgba(35, 25, 20, .54); }
 
-.profile-dialog__content { padding: 1.5rem; }
+.profile-dialog__content {
+  max-height: min(88vh, 42rem);
+  overflow-y: auto;
+  padding: 1.5rem;
+}
 
 .profile-dialog__content h2 {
   margin: 0;

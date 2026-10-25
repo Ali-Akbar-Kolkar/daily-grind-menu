@@ -17,7 +17,7 @@ const IDS = [
   'upiQrFallback', 'upiAmount', 'upiOrderId',
   'upiIdText', 'upiCopy', 'upiCopyStatus', 'orderAgain', 'cartLive',
   'profileEdit', 'profileDialog', 'profileForm', 'profileName', 'profileEmail',
-  'profileStatus', 'profileSkip', 'profileForget'
+  'profilePhone', 'profileStatus', 'profileSkip', 'profileForget'
 ];
 const CONFIG = {
   appsScriptUrl: 'https://script.google.com/macros/s/test-deployment/exec',
@@ -158,7 +158,8 @@ function buildDom() {
   byId.upiQrDisplay.appendChild(byId.upiQr);
   ['orderName', 'orderEmail', 'orderPhone', 'whatsappOptIn', 'orderWebsite', 'orderSubmit']
     .forEach((id) => byId.orderForm.appendChild(byId[id]));
-  ['profileName', 'profileEmail', 'profileStatus', 'profileSkip', 'profileForget'].forEach((id) => byId.profileForm.appendChild(byId[id]));
+  ['profileName', 'profileEmail', 'profilePhone', 'profileStatus', 'profileSkip', 'profileForget']
+    .forEach((id) => byId.profileForm.appendChild(byId[id]));
   ['stepCart', 'stepEmail', 'stepPay'].forEach((id) => byId.cart.appendChild(byId[id]));
   return { document, byId };
 }
@@ -254,6 +255,11 @@ function check(label, condition, detail) {
   check('email validation remains available', cart.order.isEmail('customer@example.com'));
   check('WhatsApp phone validation requires E.164 format',
     cart.order.isWhatsAppPhone('+919876543210') && !cart.order.isWhatsAppPhone('9876543210'));
+  check('Indian mobile numbers normalize to +91 E.164',
+    cart.order.normalizePhone('9876543210') === '+919876543210' &&
+    cart.order.normalizePhone('91 98765 43210') === '+919876543210' &&
+    cart.order.normalizePhone('+91 98765-43210') === '+919876543210' &&
+    cart.order.normalizePhone('+91') === '');
   check('web app URL enables ordering', cart.order.orderable() === true);
   check('drawer is marked ready', cart.dom.cart.getAttribute('data-ready') === 'true');
 
@@ -269,35 +275,45 @@ function check(label, condition, detail) {
     emptyCart.document.activeElement === emptyCart.dom.menu);
 
   const firstVisit = await boot();
-  check('first visit asks whether to save name and email', firstVisit.dom.profileDialog.open === true);
+  check('first visit asks to save name, email, and mobile number',
+    firstVisit.dom.profileDialog.open === true && firstVisit.dom.profilePhone.value === '+91 ');
   firstVisit.dom.profileName.value = 'A Customer';
   firstVisit.dom.profileEmail.value = 'customer@example.com';
+  firstVisit.dom.profilePhone.value = '9876543210';
   firstVisit.dom.profileForm.listeners.submit[0]({ preventDefault() {} });
   check('valid details are saved under a separate customer-profile key',
     JSON.parse(firstVisit.store.getItem('cafecustomer.v1')).name === 'A Customer' &&
+    JSON.parse(firstVisit.store.getItem('cafecustomer.v1')).phone === '+919876543210' &&
     firstVisit.store.getItem('cafecart.v1') === null);
   check('saving details prefills checkout and closes the prompt',
     firstVisit.dom.orderName.value === 'A Customer' &&
     firstVisit.dom.orderEmail.value === 'customer@example.com' &&
+    firstVisit.dom.orderPhone.value === '+919876543210' &&
     firstVisit.dom.profileDialog.open === false);
   check('saved profile offers an edit action', firstVisit.dom.profileEdit.textContent === 'Edit my details');
   firstVisit.order.startNewOrder();
   check('starting a new order keeps the saved details and profile storage',
     firstVisit.dom.orderName.value === 'A Customer' &&
     firstVisit.dom.orderEmail.value === 'customer@example.com' &&
+    firstVisit.dom.orderPhone.value === '+919876543210' &&
+    firstVisit.dom.whatsappOptIn.checked === false &&
     firstVisit.store.getItem('cafecustomer.v1') !== null);
   const returningVisit = await boot({ storage: firstVisit.store });
   check('saved details are restored on a later visit without prompting',
     returningVisit.dom.orderName.value === 'A Customer' &&
     returningVisit.dom.orderEmail.value === 'customer@example.com' &&
+    returningVisit.dom.orderPhone.value === '+919876543210' &&
     returningVisit.dom.profileDialog.open === false);
   returningVisit.dom.profileEdit.listeners.click[0]();
   returningVisit.dom.profileName.value = 'Updated Customer';
   returningVisit.dom.profileEmail.value = 'updated@example.com';
+  returningVisit.dom.profilePhone.value = '+91 98765 00001';
   returningVisit.dom.profileForm.listeners.submit[0]({ preventDefault() {} });
   check('edited details replace the saved profile and checkout values',
     JSON.parse(firstVisit.store.getItem('cafecustomer.v1')).name === 'Updated Customer' &&
-    returningVisit.dom.orderEmail.value === 'updated@example.com');
+    JSON.parse(firstVisit.store.getItem('cafecustomer.v1')).phone === '+919876500001' &&
+    returningVisit.dom.orderEmail.value === 'updated@example.com' &&
+    returningVisit.dom.orderPhone.value === '+919876500001');
   returningVisit.dom.profileEdit.listeners.click[0]();
   returningVisit.dom.profileName.value = 'Bad Update';
   returningVisit.dom.profileEmail.value = 'invalid';
@@ -309,7 +325,23 @@ function check(label, condition, detail) {
   check('forget details removes only the profile and clears checkout fields',
     firstVisit.store.getItem('cafecustomer.v1') === null &&
     returningVisit.dom.orderName.value === '' &&
-    returningVisit.dom.orderEmail.value === '');
+    returningVisit.dom.orderEmail.value === '' &&
+    returningVisit.dom.orderPhone.value === '+91 ');
+
+  const legacyProfile = await boot({
+    storage: fakeStorage({
+      'cafecustomer.v1': JSON.stringify({ name: 'Legacy Customer', email: 'legacy@example.com' })
+    })
+  });
+  check('existing saved profiles are prompted once to add a mobile number',
+    legacyProfile.dom.profileDialog.open === true &&
+    legacyProfile.dom.profilePhone.value === '+91 ');
+  legacyProfile.dom.profilePhone.value = '9876543210';
+  legacyProfile.dom.profileForm.listeners.submit[0]({ preventDefault() {} });
+  check('existing saved profile keeps its details and saves the new number',
+    JSON.parse(legacyProfile.store.getItem('cafecustomer.v1')).name === 'Legacy Customer' &&
+    JSON.parse(legacyProfile.store.getItem('cafecustomer.v1')).phone === '+919876543210' &&
+    legacyProfile.dom.profileDialog.open === false);
 
   const invalidProfile = await boot();
   invalidProfile.dom.profileName.value = '';
@@ -318,8 +350,15 @@ function check(label, condition, detail) {
   check('missing name is not stored', invalidProfile.store.getItem('cafecustomer.v1') === null);
   invalidProfile.dom.profileName.value = 'A Customer';
   invalidProfile.dom.profileEmail.value = 'invalid';
+  invalidProfile.dom.profilePhone.value = '9876543210';
   invalidProfile.dom.profileForm.listeners.submit[0]({ preventDefault() {} });
   check('invalid first-visit email is not stored', invalidProfile.store.getItem('cafecustomer.v1') === null);
+  invalidProfile.dom.profileEmail.value = 'customer@example.com';
+  invalidProfile.dom.profilePhone.value = '+91';
+  invalidProfile.dom.profileForm.listeners.submit[0]({ preventDefault() {} });
+  check('invalid first-visit phone is not stored',
+    invalidProfile.store.getItem('cafecustomer.v1') === null &&
+    /valid mobile number/i.test(invalidProfile.dom.profileStatus.textContent));
   invalidProfile.dom.profileSkip.listeners.click[0]();
   check('first-time visitor can continue without saving', invalidProfile.dom.profileDialog.open === false);
 
@@ -328,7 +367,7 @@ function check(label, condition, detail) {
   cart.order.add(itemKey(cart.order, 'Croissant'), 1);
   cart.dom.orderName.value = 'A Customer';
   cart.dom.orderEmail.value = 'customer@example.com';
-  cart.dom.orderPhone.value = '+919876543210';
+  cart.dom.orderPhone.value = '9876543210';
   cart.dom.whatsappOptIn.checked = true;
   cart.order.openCart('email');
   await cart.order.submitOrder({ preventDefault() {} });
@@ -423,11 +462,11 @@ function check(label, condition, detail) {
   invalidWhatsApp.order.add(itemKey(invalidWhatsApp.order, 'Flat White'), 1);
   invalidWhatsApp.dom.orderName.value = 'A Customer';
   invalidWhatsApp.dom.orderEmail.value = 'customer@example.com';
-  invalidWhatsApp.dom.orderPhone.value = '9876543210';
+  invalidWhatsApp.dom.orderPhone.value = '12345';
   invalidWhatsApp.dom.whatsappOptIn.checked = true;
   await invalidWhatsApp.order.submitOrder({ preventDefault() {} });
   check('invalid or missing international phone blocks WhatsApp opt-in',
-    invalidWhatsApp.requests.length === 0 && /international format/i.test(invalidWhatsApp.dom.orderStatus.textContent));
+    invalidWhatsApp.requests.length === 0 && /valid mobile number.*\+91/i.test(invalidWhatsApp.dom.orderStatus.textContent));
 
   const missingConfig = await boot({ config: { appsScriptUrl: '' } });
   missingConfig.order.setMenu(MENU);
@@ -658,9 +697,16 @@ function check(label, condition, detail) {
     !/<a id="upiQr(Link|Display)"/.test(HTML) &&
     /id="upiQrDownload"[^>]*download[^>]*hidden>Download QR \(JPG\)<\/a>/.test(HTML) &&
     /Scan the QR with another device/.test(HTML));
+  check('profile saves a mobile number and checkout starts with +91',
+    /id="profilePhone"[^>]*value="\+91 "/.test(HTML) &&
+    /id="orderPhone"[^>]*value="\+91 "/.test(HTML) &&
+    /id="profilePhone"/.test(HTML) &&
+    /Saved contact details stay in this browser/.test(HTML));
   check('pinned QR library loads before order.js',
     HTML.indexOf('https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js') !== -1 &&
-    HTML.indexOf('qrcode-generator/1.4.4/qrcode.min.js') < HTML.indexOf('src="order.js"'));
+    HTML.indexOf('qrcode-generator/1.4.4/qrcode.min.js') < HTML.indexOf('src="order.js?v='));
+  check('profile phone update uses a cache-busted order script',
+    /src="order\.js\?v=20261025-profile-phone"[^>]*defer/.test(HTML));
   check('WhatsApp link opens safely and explains the manual backup confirmation',
     /id="whatsappOrder"[^>]*target="_blank"[^>]*rel="noopener noreferrer"[^>]*hidden/.test(HTML) &&
     /Optional: send your order to the cafe on WhatsApp\./.test(HTML));

@@ -147,9 +147,9 @@
           </label>
 
           <label class="field">
-            <span class="field__label">WhatsApp number (optional)</span>
+            <span class="field__label">Mobile / WhatsApp number (optional)</span>
             <input id="orderPhone" class="field__input" type="tel" name="phone"
-                   autocomplete="tel" inputmode="tel" placeholder="+919876543210">
+                   autocomplete="tel" inputmode="tel" value="+91 " placeholder="+91 9876543210">
           </label>
 
           <label class="field field--check">
@@ -169,7 +169,7 @@
             <button type="submit" id="orderSubmit" class="btn btn--wide">Send order</button>
           </div>
 
-          <p class="cart__fine">WhatsApp is optional. Your number is not saved to your profile, but may be retained on this device with a pending order so you can retry it. This page does not take payment.</p>
+          <p class="cart__fine">WhatsApp updates are optional and require your consent. Saved contact details stay in this browser; your number is sent with an order only if you opt in. This page does not take payment.</p>
         </form>
       </section>
 
@@ -213,7 +213,7 @@
 <dialog id="profileDialog" class="profile-dialog" aria-labelledby="profileTitle">
   <form id="profileForm" class="profile-dialog__content" novalidate>
     <h2 id="profileTitle">Faster checkout next time</h2>
-    <p class="profile-dialog__lead">Save your name and email in this browser. They’ll be filled in at checkout on this device.</p>
+    <p class="profile-dialog__lead">Save your name, email, and mobile number in this browser. They’ll be filled in at checkout on this device.</p>
     <label class="field">
       <span class="field__label">Your name</span>
       <input id="profileName" class="field__input" type="text" autocomplete="name" maxlength="100" required>
@@ -222,13 +222,17 @@
       <span class="field__label">Your email</span>
       <input id="profileEmail" class="field__input" type="email" autocomplete="email" inputmode="email" spellcheck="false" required>
     </label>
+    <label class="field">
+      <span class="field__label">Mobile number</span>
+      <input id="profilePhone" class="field__input" type="tel" autocomplete="tel" inputmode="tel" value="+91 " placeholder="+91 9876543210" required>
+    </label>
     <p id="profileStatus" class="note" role="status" hidden></p>
     <div class="profile-dialog__actions">
       <button type="submit" class="btn">Save details</button>
       <button type="button" id="profileSkip" class="btn btn--ghost">Continue without saving</button>
       <button type="button" id="profileForget" class="btn btn--ghost" hidden>Forget saved details</button>
     </div>
-    <p class="profile-dialog__fine">Only your name and email are saved here—not a password. Anyone using this browser may be able to see them. You can edit or forget them anytime.</p>
+    <p class="profile-dialog__fine">Your name, email, and mobile number are saved only in this browser—not a password. Anyone using this browser may be able to see them. You can edit or forget them anytime. Saving your number does not opt you in to WhatsApp messages.</p>
   </form>
 </dialog>
 
@@ -239,7 +243,7 @@
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5/papaparse.min.js" defer></script>
 <script src="submit-order.js" defer></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js" defer></script>
-<script src="order.js" defer></script>
+<script src="order.js?v=20261025-profile-phone" defer></script>
 <script src="script.js" defer></script>
 </body>
 </html>
