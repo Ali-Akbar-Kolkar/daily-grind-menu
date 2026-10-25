@@ -13,7 +13,8 @@ const IDS = [
   'stepEmail', 'orderForm', 'orderName', 'orderEmail', 'orderWebsite', 'orderSubmit',
   'orderPhone', 'whatsappOptIn',
   'orderStatus', 'stepPay', 'payTotal', 'payId', 'payStatus', 'paymentPageLink', 'whatsappOrder',
-  'upiPayment', 'upiOpen', 'upiQrLink', 'upiQr', 'upiQrDownload', 'upiQrFallback', 'upiAmount', 'upiOrderId',
+  'upiPayment', 'upiOpen', 'upiQrLink', 'upiQr', 'upiQrDownload', 'upiQrDownloadStatus',
+  'upiQrFallback', 'upiAmount', 'upiOrderId',
   'upiIdText', 'upiCopy', 'upiCopyStatus', 'orderAgain', 'cartLive',
   'profileEdit', 'profileDialog', 'profileForm', 'profileName', 'profileEmail',
   'profileStatus', 'profileSkip', 'profileForget'
@@ -113,7 +114,18 @@ function buildDom() {
   };
   document.documentElement = makeNode('html');
   document.body = makeNode('body');
-  document.createElement = makeNode;
+  document.createElement = (tag) => {
+    const node = makeNode(tag);
+    if (String(tag).toLowerCase() === 'canvas') {
+      node.getContext = () => ({
+        fillRect() {},
+        drawImage() {},
+        set fillStyle(value) { node._fillStyle = value; }
+      });
+      node.toDataURL = (type) => type === 'image/jpeg' ? 'data:image/jpeg;base64,VEVTVA==' : 'data:,';
+    }
+    return node;
+  };
   document.createDocumentFragment = () => makeNode('#fragment');
   document.createTextNode = (text) => ({ textContent: String(text), children: [] });
   document.getElementById = (id) => byId[id] || null;
@@ -140,7 +152,8 @@ function buildDom() {
     ['stepEmail', ['orderForm', 'orderStatus']],
     ['stepPay', ['payTotal', 'payId', 'payStatus', 'paymentPageLink', 'whatsappOrder', 'upiPayment', 'orderAgain']]
   ].forEach(([parent, children]) => children.forEach((id) => byId[parent].appendChild(byId[id])));
-  ['upiOpen', 'upiQrLink', 'upiQrDownload', 'upiQrFallback', 'upiAmount', 'upiOrderId', 'upiIdText', 'upiCopy', 'upiCopyStatus']
+  ['upiOpen', 'upiQrLink', 'upiQrDownload', 'upiQrDownloadStatus', 'upiQrFallback', 'upiAmount',
+    'upiOrderId', 'upiIdText', 'upiCopy', 'upiCopyStatus']
     .forEach((id) => byId.upiPayment.appendChild(byId[id]));
   byId.upiQrLink.appendChild(byId.upiQr);
   ['orderName', 'orderEmail', 'orderPhone', 'whatsappOptIn', 'orderWebsite', 'orderSubmit']
@@ -174,6 +187,19 @@ async function boot(options = {}) {
     isFinite, parseFloat, parseInt, encodeURIComponent, decodeURIComponent, Map, Set,
     Promise, Uint8Array, setTimeout, clearTimeout, setInterval, clearInterval,
     location: { search: options.search || '' },
+    Image: function () {
+      Object.defineProperty(this, 'src', {
+        set(value) {
+          this._src = value;
+          if (options.jpeg === false) {
+            if (this.onerror) this.onerror(new Error('Image conversion unavailable'));
+          } else if (this.onload) {
+            this.onload();
+          }
+        },
+        get() { return this._src; }
+      });
+    },
     navigator: {
       clipboard: options.clipboard === false ? null : {
         writeText: async (text) => {
@@ -333,8 +359,8 @@ function check(label, condition, detail) {
     cart.dom.upiQr.innerHTML.includes('<svg') &&
     cart.dom.upiQr.getAttribute('aria-label').includes(payload.orderId) &&
     cart.dom.upiQrDownload.hidden === false &&
-    cart.dom.upiQrDownload.getAttribute('href').startsWith('data:image/svg+xml;charset=utf-8,') &&
-    cart.dom.upiQrDownload.getAttribute('download') === 'upi-payment-' + payload.orderId + '.svg' &&
+    cart.dom.upiQrDownload.getAttribute('href').startsWith('data:image/jpeg;base64,') &&
+    cart.dom.upiQrDownload.getAttribute('download') === 'upi-payment-' + payload.orderId + '.jpg' &&
     cart.dom.upiAmount.textContent === '₹12.75' &&
     cart.dom.upiOrderId.textContent === payload.orderId &&
     cart.dom.upiIdText.textContent === CONFIG.upiId);
@@ -572,6 +598,18 @@ function check(label, condition, detail) {
     noQrLibrary.dom.upiQrFallback.hidden === false &&
     noQrLibrary.dom.upiOpen.getAttribute('href').startsWith('upi://pay?') &&
     noQrLibrary.dom.upiIdText.textContent === CONFIG.upiId);
+  const noJpegSupport = await boot({ jpeg: false });
+  noJpegSupport.order.setMenu(MENU);
+  noJpegSupport.order.add(itemKey(noJpegSupport.order, 'Flat White'), 1);
+  noJpegSupport.dom.orderName.value = 'A Customer';
+  noJpegSupport.dom.orderEmail.value = 'customer@example.com';
+  await noJpegSupport.order.submitOrder({ preventDefault() {} });
+  check('JPEG conversion failure keeps the QR visible and explains the fallback',
+    noJpegSupport.dom.upiQrLink.hidden === false &&
+    noJpegSupport.dom.upiQrDownload.hidden === true &&
+    noJpegSupport.dom.upiQrDownloadStatus.hidden === false &&
+    /could not prepare a JPG/i.test(noJpegSupport.dom.upiQrDownloadStatus.textContent) &&
+    noJpegSupport.logs.error.some((args) => /Could not prepare a JPG payment QR download/.test(args[0])));
   const noUpiConfig = await boot({ config: { upiId: '' } });
   noUpiConfig.order.setMenu(MENU);
   noUpiConfig.order.add(itemKey(noUpiConfig.order, 'Flat White'), 1);
@@ -617,9 +655,9 @@ function check(label, condition, detail) {
     /src="submit-order\.js"/.test(HTML) && /id="orderName"/.test(HTML) &&
     /id="orderPhone"/.test(HTML) && /id="whatsappOptIn"/.test(HTML) &&
     /id="profileDialog"/.test(HTML) && /id="profileEdit"/.test(HTML));
-  check('payment QR is a UPI app link with a local SVG download',
+  check('payment QR is a UPI app link with a local JPG download',
     /id="upiQrLink"[^>]*href=""[^>]*hidden/.test(HTML) &&
-    /id="upiQrDownload"[^>]*download[^>]*hidden/.test(HTML) &&
+    /id="upiQrDownload"[^>]*download[^>]*hidden>Download QR \(JPG\)<\/a>/.test(HTML) &&
     /Tap the QR to open your UPI app/.test(HTML));
   check('pinned QR library loads before order.js',
     HTML.indexOf('https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js') !== -1 &&

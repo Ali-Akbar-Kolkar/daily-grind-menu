@@ -186,14 +186,15 @@
             <a id="upiQrLink" class="upi-payment__qr-link" href="" aria-label="Open this payment in a UPI app" hidden>
               <div id="upiQr" class="upi-payment__qr" role="img"></div>
             </a>
-            <a id="upiQrDownload" class="btn btn--ghost upi-payment__download" href="" download hidden>Download QR</a>
+            <a id="upiQrDownload" class="btn btn--ghost upi-payment__download" href="" download hidden>Download QR (JPG)</a>
+            <p id="upiQrDownloadStatus" class="upi-payment__fallback" role="status" hidden></p>
             <p id="upiQrFallback" class="upi-payment__fallback" hidden>QR preview is unavailable. Use Open UPI app or copy the UPI ID below.</p>
             <p class="upi-payment__detail">Amount: <strong id="upiAmount"></strong></p>
             <p class="upi-payment__detail">Order reference: <strong id="upiOrderId"></strong></p>
             <p class="upi-payment__detail">UPI ID: <strong id="upiIdText"></strong></p>
             <button id="upiCopy" class="btn btn--ghost" type="button">Copy UPI ID</button>
             <p id="upiCopyStatus" class="note" role="status" aria-live="polite" hidden></p>
-            <p class="upi-payment__hint">Tap the QR to open your UPI app, or scan it from another device. Pay the exact amount and keep the order ID as the reference.</p>
+            <p class="upi-payment__hint">Tap the QR to open your UPI app, or scan it from another device. You can also save the QR as a JPG. Pay the exact amount and keep the order ID as the reference.</p>
             <p class="upi-payment__caveat">This amount comes from the order submitted in this browser; the cafe will verify it against its bank app. Because this page cannot confirm Apps Script acceptance, wait for the order email. The cafe's email remains the confirmation of record.</p>
           </div>
           <a id="whatsappOrder" class="btn btn--wide pay__whatsapp" href="" target="_blank" rel="noopener noreferrer" hidden>Send order on WhatsApp</a>

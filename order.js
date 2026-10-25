@@ -259,7 +259,7 @@
     'whatsappOptIn', 'orderWebsite',
     'orderSubmit', 'orderStatus', 'stepPay', 'payTotal', 'payId',
     'payStatus', 'paymentPageLink', 'whatsappOrder', 'upiPayment', 'upiOpen', 'upiQrLink', 'upiQr',
-    'upiQrDownload', 'upiQrFallback',
+    'upiQrDownload', 'upiQrDownloadStatus', 'upiQrFallback',
     'upiAmount', 'upiOrderId', 'upiIdText', 'upiCopy', 'upiCopyStatus',
     'orderAgain', 'cartLive', 'profileEdit', 'profileDialog',
     'profileForm', 'profileName', 'profileEmail', 'profileStatus', 'profileSkip',
@@ -856,6 +856,58 @@
     dom.whatsappOrder.setAttribute('href', url);
   }
 
+  function reportQrDownloadError(error) {
+    if (dom.upiQrDownloadStatus) {
+      dom.upiQrDownloadStatus.textContent =
+        'Could not prepare a JPG on this device. You can still tap or scan the QR above.';
+      dom.upiQrDownloadStatus.hidden = false;
+    }
+    if (typeof console !== 'undefined' && typeof console.error === 'function') {
+      console.error('Could not prepare a JPG payment QR download:', error);
+    }
+  }
+
+  function prepareQrJpegDownload(svg, orderId, link) {
+    if (!dom.upiQrDownload || typeof window.Image !== 'function') {
+      reportQrDownloadError(new Error('Image conversion is unavailable.'));
+      return;
+    }
+
+    try {
+      var image = new window.Image();
+      image.onload = function () {
+        if (lastUpiLink !== link) return;
+        try {
+          var size = 512;
+          var canvas = document.createElement('canvas');
+          canvas.width = size;
+          canvas.height = size;
+          var context = canvas.getContext('2d');
+          if (!context) throw new Error('Canvas rendering is unavailable.');
+          context.fillStyle = '#fff';
+          context.fillRect(0, 0, size, size);
+          context.drawImage(image, 0, 0, size, size);
+          var jpeg = canvas.toDataURL('image/jpeg', 0.95);
+          if (!/^data:image\/jpeg(?:;|,)/i.test(jpeg)) {
+            throw new Error('The browser could not encode the QR as JPEG.');
+          }
+          dom.upiQrDownload.setAttribute('href', jpeg);
+          dom.upiQrDownload.setAttribute('download', 'upi-payment-' + orderId + '.jpg');
+          dom.upiQrDownload.hidden = false;
+          if (dom.upiQrDownloadStatus) dom.upiQrDownloadStatus.hidden = true;
+        } catch (error) {
+          reportQrDownloadError(error);
+        }
+      };
+      image.onerror = function (error) {
+        if (lastUpiLink === link) reportQrDownloadError(error);
+      };
+      image.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+    } catch (error) {
+      reportQrDownloadError(error);
+    }
+  }
+
   function updateUpiPayment() {
     if (!dom.upiPayment) return;
     var paymentStep = phase === 'awaiting-payment' || (demo && phase === 'placed');
@@ -874,6 +926,7 @@
         dom.upiQrDownload.hidden = true;
         dom.upiQrDownload.setAttribute('href', '');
       }
+      if (dom.upiQrDownloadStatus) dom.upiQrDownloadStatus.hidden = true;
       if (dom.upiQrFallback) dom.upiQrFallback.hidden = true;
       if (dom.upiOpen) dom.upiOpen.setAttribute('href', '');
       return;
@@ -900,6 +953,7 @@
       dom.upiQrDownload.hidden = true;
       dom.upiQrDownload.setAttribute('href', '');
     }
+    if (dom.upiQrDownloadStatus) dom.upiQrDownloadStatus.hidden = true;
     if (!dom.upiQr || typeof window.qrcode !== 'function') {
       return;
     }
@@ -911,14 +965,7 @@
       var svg = qr.createSvgTag(5, 2);
       dom.upiQr.innerHTML = svg;
       if (dom.upiQrLink) dom.upiQrLink.hidden = false;
-      if (dom.upiQrDownload) {
-        dom.upiQrDownload.setAttribute(
-          'href',
-          'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg)
-        );
-        dom.upiQrDownload.setAttribute('download', 'upi-payment-' + order.id + '.svg');
-        dom.upiQrDownload.hidden = false;
-      }
+      prepareQrJpegDownload(svg, order.id, link);
       if (dom.upiQrFallback) dom.upiQrFallback.hidden = true;
     } catch (error) {
       if (dom.upiQrLink) dom.upiQrLink.hidden = true;
