@@ -19,6 +19,10 @@
 
   var DEFAULTS = {
     appsScriptUrl: '',
+    whatsappNumber: '',
+    cafeName: 'The Daily Grind',
+    upiId: '',
+    payeeName: '',
     currency: 'INR',
     locale: 'en-IN',
     maxQtyPerLine: 20,
@@ -184,6 +188,58 @@
       .join('\n');
   }
 
+  function buildWhatsAppUrl(order, options) {
+    options = options || {};
+    var phone = String(options.whatsappNumber || '').trim();
+    if (!/^\d{8,15}$/.test(phone) || !order) return '';
+
+    var cafeName = String(options.cafeName || 'The Daily Grind').slice(0, 100);
+    var customerName = String(order.customerName || '').slice(0, 100);
+    var orderId = String(order.id || '');
+    var total = money(Number(order.totalPaise) || 0);
+    var itemLines = Array.isArray(order.lines)
+      ? order.lines.map(function (line) { return line.qty + ' x ' + line.name; })
+      : [];
+    var message;
+    var included = itemLines.length;
+
+    do {
+      var remaining = itemLines.length - included;
+      var items = itemLines.slice(0, included).join('\n');
+      if (remaining) items += (items ? '\n' : '') + '+' + remaining + ' more items';
+      message = 'Cafe: ' + cafeName + '\n' +
+        'Order ID: ' + orderId + '\n' +
+        'Customer: ' + customerName + '\n\n' +
+        'Items:\n' + items + '\n\n' +
+        'Total: ' + total + '\n' +
+        'Please send the UPI payment details.';
+      if (message.length <= 1000 || included === 0) break;
+      included -= 1;
+    } while (true);
+
+    return 'https://wa.me/' + phone + '?text=' + encodeURIComponent(message);
+  }
+
+  function buildUpiLink(order, options) {
+    options = options || {};
+    var upiId = String(options.upiId || '').trim();
+    var amountPaise = Number(order && order.totalPaise);
+    if (!/^[\w.\-]{2,}@[A-Za-z]{2,}$/.test(upiId) ||
+        !isFinite(amountPaise) || amountPaise <= 0) return '';
+
+    var payeeName = String(options.payeeName || options.cafeName || 'The Daily Grind');
+    var orderId = String(order && order.id || '');
+    var params = [
+      'pa=' + encodeURIComponent(upiId),
+      'pn=' + encodeURIComponent(payeeName),
+      'am=' + (amountPaise / 100).toFixed(2),
+      'cu=INR',
+      'tn=' + encodeURIComponent(orderId),
+      'tr=' + encodeURIComponent(orderId)
+    ];
+    return 'upi://pay?' + params.join('&');
+  }
+
   /* ------------------------------------------------------------------ *
    * state
    * ------------------------------------------------------------------ */
@@ -194,7 +250,9 @@
     'cartClear', 'stepEmail', 'orderForm', 'orderName', 'orderEmail', 'orderPhone',
     'whatsappOptIn', 'orderWebsite',
     'orderSubmit', 'orderStatus', 'stepPay', 'payTotal', 'payId',
-    'payStatus', 'orderAgain', 'cartLive', 'profileEdit', 'profileDialog',
+    'payStatus', 'whatsappOrder', 'upiPayment', 'upiOpen', 'upiQr', 'upiQrFallback',
+    'upiAmount', 'upiOrderId', 'upiIdText', 'upiCopy', 'upiCopyStatus',
+    'orderAgain', 'cartLive', 'profileEdit', 'profileDialog',
     'profileForm', 'profileName', 'profileEmail', 'profileStatus', 'profileSkip',
     'profileForget'
   ];
@@ -210,6 +268,7 @@
   var storageOk = true;
   var lastFocus = null;
   var customerProfile = null;
+  var lastUpiLink = '';
 
   function storage() {
     try {
@@ -767,6 +826,99 @@
     if (dom.stepCart) dom.stepCart.hidden = next !== 'cart';
     if (dom.stepEmail) dom.stepEmail.hidden = next !== 'email';
     if (dom.stepPay) dom.stepPay.hidden = next !== 'pay';
+    updateWhatsAppOrderLink();
+  }
+
+  function updateWhatsAppOrderLink() {
+    if (!dom.whatsappOrder) return;
+    var url = order && (phase === 'awaiting-payment' || (demo && phase === 'placed'))
+      ? buildWhatsAppUrl(order, config)
+      : '';
+    dom.whatsappOrder.hidden = !url;
+    dom.whatsappOrder.setAttribute('href', url);
+  }
+
+  function updateUpiPayment() {
+    if (!dom.upiPayment) return;
+    var paymentStep = phase === 'awaiting-payment' || (demo && phase === 'placed');
+    var link = order && paymentStep ? buildUpiLink(order, config) : '';
+    dom.upiPayment.hidden = !link;
+    if (!link) {
+      lastUpiLink = '';
+      if (dom.upiQr) {
+        dom.upiQr.textContent = '';
+        dom.upiQr.hidden = true;
+      }
+      if (dom.upiQrFallback) dom.upiQrFallback.hidden = true;
+      if (dom.upiOpen) dom.upiOpen.setAttribute('href', '');
+      return;
+    }
+
+    var upiId = String(config.upiId).trim();
+    var amount = money(order.totalPaise);
+    if (dom.upiOpen) dom.upiOpen.setAttribute('href', link);
+    if (dom.upiAmount) dom.upiAmount.textContent = amount;
+    if (dom.upiOrderId) dom.upiOrderId.textContent = order.id;
+    if (dom.upiIdText) dom.upiIdText.textContent = upiId;
+    if (dom.upiQr) dom.upiQr.setAttribute(
+      'aria-label',
+      'UPI payment QR for order ' + order.id + ', amount ' + amount
+    );
+    if (lastUpiLink === link) return;
+    lastUpiLink = link;
+
+    if (dom.upiQr) dom.upiQr.textContent = '';
+    if (dom.upiQrFallback) dom.upiQrFallback.hidden = false;
+    if (!dom.upiQr || typeof window.qrcode !== 'function') {
+      if (dom.upiQr) dom.upiQr.hidden = true;
+      return;
+    }
+
+    try {
+      var qr = window.qrcode(0, 'M');
+      qr.addData(link);
+      qr.make();
+      dom.upiQr.innerHTML = qr.createSvgTag(5, 2);
+      dom.upiQr.hidden = false;
+      if (dom.upiQrFallback) dom.upiQrFallback.hidden = true;
+    } catch (error) {
+      dom.upiQr.hidden = true;
+      if (typeof console !== 'undefined' && typeof console.error === 'function') {
+        console.error('Could not render the on-page UPI QR:', error);
+      }
+    }
+  }
+
+  async function copyUpiId() {
+    if (!dom.upiIdText || !config.upiId) return;
+    var copied = false;
+    if (typeof navigator !== 'undefined' && navigator.clipboard &&
+        typeof navigator.clipboard.writeText === 'function') {
+      try {
+        await navigator.clipboard.writeText(String(config.upiId));
+        copied = true;
+      } catch (error) {
+        copied = false;
+      }
+    }
+    if (!copied && document.body && typeof document.execCommand === 'function') {
+      var field = document.createElement('textarea');
+      field.value = String(config.upiId);
+      document.body.appendChild(field);
+      if (typeof field.select === 'function') field.select();
+      try {
+        copied = document.execCommand('copy');
+      } catch (error) {
+        copied = false;
+      }
+      if (field.parentNode && typeof field.parentNode.removeChild === 'function') {
+        field.parentNode.removeChild(field);
+      } else if (typeof field.remove === 'function') {
+        field.remove();
+      }
+    }
+    say(dom.upiCopyStatus, copied ? 'UPI ID copied.' : 'Could not copy the UPI ID. Please select and copy it manually.',
+      copied ? 'ok' : 'warn');
   }
 
   function render(keepRows) {
@@ -812,6 +964,8 @@
 
     if (dom.payTotal) dom.payTotal.textContent = order ? money(order.totalPaise) : money(totalPaise());
     if (dom.payId) dom.payId.textContent = order ? order.id : '';
+    updateWhatsAppOrderLink();
+    updateUpiPayment();
 
     if (dom.orderAgain) {
       dom.orderAgain.hidden = phase !== 'placed' && phase !== 'awaiting-payment';
@@ -1129,6 +1283,7 @@
     if (dom.cartClear) dom.cartClear.addEventListener('click', clearCart);
     if (dom.orderForm) dom.orderForm.addEventListener('submit', submitOrder);
     if (dom.orderAgain) dom.orderAgain.addEventListener('click', startNewOrder);
+    if (dom.upiCopy) dom.upiCopy.addEventListener('click', copyUpiId);
     if (dom.profileEdit) dom.profileEdit.addEventListener('click', openProfileDialog);
     if (dom.profileForm) dom.profileForm.addEventListener('submit', submitCustomerProfile);
     if (dom.profileSkip) {
@@ -1183,6 +1338,8 @@
     lineText: lineText,
     orderLinesText: orderLinesText,
     backendPayload: backendPayload,
+    buildWhatsAppUrl: buildWhatsAppUrl,
+    buildUpiLink: buildUpiLink,
 
     /* state, for the test suite */
     lines: function () { return lines.slice(); },

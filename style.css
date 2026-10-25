@@ -1000,11 +1000,85 @@ code {
   color: var(--muted);
 }
 
+.upi-payment[hidden],
+.upi-payment__qr[hidden],
+.upi-payment__fallback[hidden] { display: none; }
+
+.upi-payment {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: .45rem;
+  margin: 1rem 0;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card);
+}
+
+.upi-payment__open { order: 0; }
+
+.upi-payment__qr {
+  order: 1;
+  width: min(100%, 16rem);
+  aspect-ratio: 1;
+  padding: .5rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+}
+
+.upi-payment__qr svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.upi-payment__fallback,
+.upi-payment__detail,
+.upi-payment__hint,
+.upi-payment__caveat {
+  margin: .2rem 0;
+  overflow-wrap: anywhere;
+}
+
+.upi-payment__fallback,
+.upi-payment__caveat {
+  font-size: .78rem;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.upi-payment__detail { font-size: .88rem; }
+.upi-payment__detail strong { font-family: var(--mono); }
+
+.upi-payment__hint {
+  font-size: .85rem;
+  font-weight: 700;
+  color: var(--coffee);
+}
+
+.upi-payment .note { margin: .25rem 0 0; }
+
 .pay__hint {
   margin: .65rem 0 0;
   font-size: .9rem;
   font-weight: 700;
   color: var(--coffee);
+}
+
+.pay__whatsapp {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: .8rem;
+}
+
+.pay__whatsapp-note {
+  margin: .45rem 0 0;
+  font-size: .78rem;
+  line-height: 1.5;
+  color: var(--muted);
 }
 
 .pay__verify {

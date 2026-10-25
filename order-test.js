@@ -12,12 +12,18 @@ const IDS = [
   'cartLines', 'cartEmpty', 'cartTotal', 'cartNotice', 'cartStart', 'cartClear',
   'stepEmail', 'orderForm', 'orderName', 'orderEmail', 'orderWebsite', 'orderSubmit',
   'orderPhone', 'whatsappOptIn',
-  'orderStatus', 'stepPay', 'payTotal', 'payId', 'payStatus', 'orderAgain', 'cartLive',
+  'orderStatus', 'stepPay', 'payTotal', 'payId', 'payStatus', 'whatsappOrder',
+  'upiPayment', 'upiOpen', 'upiQr', 'upiQrFallback', 'upiAmount', 'upiOrderId',
+  'upiIdText', 'upiCopy', 'upiCopyStatus', 'orderAgain', 'cartLive',
   'profileEdit', 'profileDialog', 'profileForm', 'profileName', 'profileEmail',
   'profileStatus', 'profileSkip', 'profileForget'
 ];
 const CONFIG = {
   appsScriptUrl: 'https://script.google.com/macros/s/test-deployment/exec',
+  whatsappNumber: '919876543210',
+  upiId: '6363728679-3@ybl',
+  payeeName: 'The Daily Grind',
+  cafeName: 'The Daily Grind',
   currency: 'INR', locale: 'en-IN', maxQtyPerLine: 20, maxLines: 30,
   storageKey: 'cafecart.v1', demoMode: false
 };
@@ -68,12 +74,26 @@ function buildDom() {
         child.children.slice().forEach((part) => node.appendChild(part));
         child.children = [];
       } else {
+        child.parentNode = node;
         child.parent = node;
         node.children.push(child);
       }
       return child;
     };
+    node.removeChild = (child) => {
+      node.children = node.children.filter((entry) => entry !== child);
+      child.parentNode = null;
+      return child;
+    };
+    node.select = () => {};
+    node.remove = () => {
+      if (node.parentNode) node.parentNode.removeChild(node);
+    };
     node.setAttribute = (name, value) => { node.attrs[name] = String(value); };
+    Object.defineProperty(node, 'innerHTML', {
+      get() { return node._html || ''; },
+      set(value) { node._html = String(value); node.children = []; }
+    });
     node.getAttribute = (name) => (node.attrs[name] === undefined ? null : node.attrs[name]);
     node.hasAttribute = (name) => node.attrs[name] !== undefined;
     node.addEventListener = (type, listener) => { (node.listeners[type] = node.listeners[type] || []).push(listener); };
@@ -92,11 +112,13 @@ function buildDom() {
     return node;
   };
   document.documentElement = makeNode('html');
+  document.body = makeNode('body');
   document.createElement = makeNode;
   document.createDocumentFragment = () => makeNode('#fragment');
   document.createTextNode = (text) => ({ textContent: String(text), children: [] });
   document.getElementById = (id) => byId[id] || null;
   document.addEventListener = (type, listener) => { (document.listeners[type] = document.listeners[type] || []).push(listener); };
+  document.execCommand = () => true;
   IDS.forEach((id) => { byId[id] = makeNode(id); });
   byId.orderWebsite.setAttribute('tabindex', '-1');
   byId.orderEmail.type = 'email';
@@ -116,8 +138,10 @@ function buildDom() {
   [
     ['stepCart', ['cartEmpty', 'cartLines', 'cartNotice', 'cartTotal', 'cartStart', 'cartClear']],
     ['stepEmail', ['orderForm', 'orderStatus']],
-    ['stepPay', ['payTotal', 'payId', 'payStatus', 'orderAgain']]
+    ['stepPay', ['payTotal', 'payId', 'payStatus', 'whatsappOrder', 'upiPayment', 'orderAgain']]
   ].forEach(([parent, children]) => children.forEach((id) => byId[parent].appendChild(byId[id])));
+  ['upiOpen', 'upiQr', 'upiQrFallback', 'upiAmount', 'upiOrderId', 'upiIdText', 'upiCopy', 'upiCopyStatus']
+    .forEach((id) => byId.upiPayment.appendChild(byId[id]));
   ['orderName', 'orderEmail', 'orderPhone', 'whatsappOptIn', 'orderWebsite', 'orderSubmit']
     .forEach((id) => byId.orderForm.appendChild(byId[id]));
   ['profileName', 'profileEmail', 'profileStatus', 'profileSkip', 'profileForget'].forEach((id) => byId.profileForm.appendChild(byId[id]));
@@ -136,6 +160,8 @@ async function boot(options = {}) {
   const { document, byId } = buildDom();
   const requests = [];
   const logs = { info: [], warn: [], error: [] };
+  const clipboardWrites = [];
+  let copyCommands = 0;
   const store = options.storage || fakeStorage();
   const fetchImpl = async (url, init) => {
     requests.push({ url, init });
@@ -147,13 +173,33 @@ async function boot(options = {}) {
     isFinite, parseFloat, parseInt, encodeURIComponent, decodeURIComponent, Map, Set,
     Promise, Uint8Array, setTimeout, clearTimeout, setInterval, clearInterval,
     location: { search: options.search || '' },
-    navigator: { clipboard: { writeText: async () => {} } },
+    navigator: {
+      clipboard: options.clipboard === false ? null : {
+        writeText: async (text) => {
+          if (options.clipboard === 'reject') throw new Error('Clipboard unavailable');
+          clipboardWrites.push(text);
+        }
+      }
+    },
     console: {
       info: (...args) => logs.info.push(args),
       warn: (...args) => logs.warn.push(args),
       error: (...args) => logs.error.push(args)
     },
-    document, localStorage: store, fetch: fetchImpl
+    document, localStorage: store, fetch: fetchImpl,
+    qrcode: options.qrcode === undefined
+      ? function () {
+        return {
+          addData(data) { this.data = data; },
+          make() {},
+          createSvgTag() { return '<svg><path /></svg>'; }
+        };
+      }
+      : options.qrcode
+  };
+  document.execCommand = (command) => {
+    if (command === 'copy') copyCommands += 1;
+    return command === 'copy';
   };
   sandbox.window = sandbox;
   sandbox.globalThis = sandbox;
@@ -162,7 +208,7 @@ async function boot(options = {}) {
   vm.runInContext(TRANSPORT, context, { filename: 'submit-order.js' });
   vm.runInContext(ORDER, context, { filename: 'order.js' });
   (document.listeners.DOMContentLoaded || []).forEach((listener) => listener());
-  return { order: sandbox.CafeOrder, dom: byId, document, requests, logs, store };
+  return { order: sandbox.CafeOrder, dom: byId, document, requests, logs, store, clipboardWrites, copyCommands: () => copyCommands };
 }
 function itemKey(order, itemName) {
   const item = MENU.find((entry) => entry.name === itemName);
@@ -274,6 +320,15 @@ function check(label, condition, detail) {
   check('order moves to payment pending', cart.order.phase() === 'awaiting-payment');
   check('total and order ID remain visible', cart.dom.payTotal.textContent === '₹12.75' && cart.dom.payId.textContent === payload.orderId);
   check('customer is told to wait for payment email', /check your email.*before paying/i.test(cart.dom.payStatus.textContent));
+  check('on-page UPI QR appears with order-specific payment details',
+    cart.dom.upiPayment.hidden === false &&
+    cart.dom.upiOpen.getAttribute('href').startsWith('upi://pay?') &&
+    cart.dom.upiQr.hidden === false &&
+    cart.dom.upiQr.innerHTML.includes('<svg') &&
+    cart.dom.upiQr.getAttribute('aria-label').includes(payload.orderId) &&
+    cart.dom.upiAmount.textContent === '₹12.75' &&
+    cart.dom.upiOrderId.textContent === payload.orderId &&
+    cart.dom.upiIdText.textContent === CONFIG.upiId);
   check('cart clears after submission', cart.order.itemCount() === 0);
   const storedPendingOrder = JSON.parse(cart.store.getItem('cafecart.v1')).order;
   check('pending order ID, WhatsApp number, and consent are stored for retry',
@@ -286,12 +341,23 @@ function check(label, condition, detail) {
   const pendingResume = await boot({ storage: cart.store });
   check('successful pending order restores in payment-pending state',
     pendingResume.order.phase() === 'awaiting-payment' && pendingResume.order.step() === 'pay');
+  check('UPI QR block is restored for a pending order',
+    pendingResume.dom.upiPayment.hidden === false &&
+    pendingResume.dom.upiOpen.getAttribute('href') === cart.dom.upiOpen.getAttribute('href') &&
+    pendingResume.dom.upiQr.hidden === false);
+  check('WhatsApp button href is restored for a pending order',
+    pendingResume.dom.whatsappOrder.hidden === false &&
+    pendingResume.dom.whatsappOrder.getAttribute('href').startsWith('https://wa.me/919876543210?text='));
   check('pending order bar is visible after refresh', pendingResume.dom.cartBar.hidden === false);
   pendingResume.dom.cartBar.listeners.click[0]();
   check('sticky bar opens the pending-order drawer', pendingResume.dom.cart.hidden === false && pendingResume.order.step() === 'pay');
   check('start-new-order action is accessible in the drawer', pendingResume.dom.orderAgain.hidden === false);
   pendingResume.dom.orderAgain.listeners.click[0]();
   check('starting a new order unlocks menu items', pendingResume.order.phase() === 'cart' && pendingResume.dom.cartBar.hidden === true);
+  check('starting a new order clears the UPI payment block',
+    pendingResume.dom.upiPayment.hidden === true &&
+    pendingResume.dom.upiQr.hidden === true &&
+    pendingResume.dom.upiOpen.getAttribute('href') === '');
   await cart.order.submitOrder({ preventDefault() {} });
   check('pending order is not submitted twice', cart.requests.length === 1);
 
@@ -357,6 +423,135 @@ function check(label, condition, detail) {
   check('successful retry restores as payment pending',
     successfulResume.order.phase() === 'awaiting-payment' && successfulResume.order.order().id === retryId);
 
+  const waOrder = {
+    id: 'ORD-WA123456',
+    customerName: 'A Customer',
+    lines: [
+      { qty: 2, name: 'Flat White' },
+      { qty: 1, name: 'Croissant' }
+    ],
+    totalPaise: 1275
+  };
+  const waUrl = cart.order.buildWhatsAppUrl(waOrder, CONFIG);
+  const waMessage = decodeURIComponent(waUrl.split('?text=')[1]);
+  check('valid WhatsApp number creates a wa.me URL with order ID, total, and items',
+    waUrl.startsWith('https://wa.me/919876543210?text=') &&
+    waMessage.includes('ORD-WA123456') &&
+    waMessage.includes('Cafe: The Daily Grind') &&
+    waMessage.includes('₹12.75') &&
+    waMessage.includes('2 x Flat White') &&
+    waMessage.includes('1 x Croissant') &&
+    waMessage.includes('Please send the UPI payment details.'));
+  const noWhatsApp = await boot({ config: { whatsappNumber: '' } });
+  const invalidWhatsAppNumber = await boot({ config: { whatsappNumber: '+919876543210' } });
+  check('missing or invalid WhatsApp number returns empty URL and keeps button hidden',
+    cart.order.buildWhatsAppUrl(waOrder) === '' &&
+    cart.order.buildWhatsAppUrl(waOrder, { whatsappNumber: '' }) === '' &&
+    cart.order.buildWhatsAppUrl(waOrder, { whatsappNumber: '+919876543210' }) === '' &&
+    noWhatsApp.dom.whatsappOrder.hidden &&
+    invalidWhatsAppNumber.dom.whatsappOrder.hidden);
+  const longOrder = Object.assign({}, waOrder, {
+    lines: Array.from({ length: 30 }, (_, index) => ({
+      qty: index + 1,
+      name: 'Special item ' + index + ' ' + 'x'.repeat(80)
+    }))
+  });
+  const longMessage = decodeURIComponent(cart.order.buildWhatsAppUrl(longOrder, CONFIG).split('?text=')[1]);
+  check('long WhatsApp item lists are truncated while retaining order ID and total',
+    longMessage.length <= 1000 &&
+    longMessage.includes('ORD-WA123456') &&
+    longMessage.includes('₹12.75') &&
+    /\+\d+ more items/.test(longMessage));
+  const specialOrder = Object.assign({}, waOrder, {
+    customerName: 'A & B #1 😀\nSecond line',
+    lines: [{ qty: 1, name: 'Tea & Cake #2 😀\nSpecial' }]
+  });
+  const specialUrl = cart.order.buildWhatsAppUrl(specialOrder, CONFIG);
+  const specialMessage = decodeURIComponent(specialUrl.split('?text=')[1]);
+  check('WhatsApp URL safely encodes ampersand, hash, emoji, and newline',
+    specialUrl.includes('%26') &&
+    specialUrl.includes('%23') &&
+    specialUrl.includes('%F0%9F%98%80') &&
+    specialUrl.includes('%0A') &&
+    specialMessage.includes('A & B #1 😀\nSecond line') &&
+    specialMessage.includes('1 x Tea & Cake #2 😀\nSpecial'));
+
+  const upiOrder = {
+    id: 'ORD-UPI123456',
+    totalPaise: 1275
+  };
+  const upiLink = cart.order.buildUpiLink(upiOrder, CONFIG);
+  const upiParams = Object.fromEntries(upiLink.slice('upi://pay?'.length).split('&').map((part) => {
+    const splitAt = part.indexOf('=');
+    return [part.slice(0, splitAt), decodeURIComponent(part.slice(splitAt + 1))];
+  }));
+  check('UPI link matches Apps Script parameters and formatting',
+    upiLink.startsWith('upi://pay?') &&
+    upiParams.pa === CONFIG.upiId &&
+    upiParams.pn === CONFIG.payeeName &&
+    upiParams.am === '12.75' &&
+    upiParams.cu === 'INR' &&
+    upiParams.tn === upiOrder.id &&
+    upiParams.tr === upiOrder.id &&
+    Object.keys(upiParams).length === 6 &&
+    BACKEND.includes("'pa=' + encodeURIComponent(CONFIG.UPI_ID)") &&
+    BACKEND.includes("'pn=' + encodeURIComponent(CONFIG.CAFE_NAME)") &&
+    BACKEND.includes("'am=' + (order.totalPaise / 100).toFixed(2)") &&
+    BACKEND.includes("'tn=' + encodeURIComponent(order.orderId)") &&
+    BACKEND.includes("'tr=' + encodeURIComponent(order.orderId)"));
+  check('invalid or missing UPI ID and zero amount produce no payment link',
+    cart.order.buildUpiLink(upiOrder, Object.assign({}, CONFIG, { upiId: '' })) === '' &&
+    cart.order.buildUpiLink(upiOrder, Object.assign({}, CONFIG, { upiId: 'not-a-upi-id' })) === '' &&
+    cart.order.buildUpiLink(Object.assign({}, upiOrder, { totalPaise: 0 }), CONFIG) === '');
+  const specialUpiLink = cart.order.buildUpiLink(
+    { id: 'ORD #1&A', totalPaise: 1234 },
+    Object.assign({}, CONFIG, { payeeName: 'Cafe & Bakery #1' })
+  );
+  check('UPI link safely encodes special payee and order reference characters',
+    specialUpiLink.includes('pn=Cafe%20%26%20Bakery%20%231') &&
+    specialUpiLink.includes('tn=ORD%20%231%26A') &&
+    specialUpiLink.includes('tr=ORD%20%231%26A') &&
+    decodeURIComponent(specialUpiLink).includes('Cafe & Bakery #1'));
+  await cart.dom.upiCopy.listeners.click[0]();
+  check('Copy UPI ID button uses the clipboard when available',
+    cart.clipboardWrites[0] === CONFIG.upiId &&
+    /copied/i.test(cart.dom.upiCopyStatus.textContent));
+  const fallbackCopy = await boot({ clipboard: 'reject' });
+  fallbackCopy.order.setMenu(MENU);
+  fallbackCopy.order.add(itemKey(fallbackCopy.order, 'Flat White'), 1);
+  fallbackCopy.dom.orderName.value = 'A Customer';
+  fallbackCopy.dom.orderEmail.value = 'customer@example.com';
+  await fallbackCopy.order.submitOrder({ preventDefault() {} });
+  await fallbackCopy.dom.upiCopy.listeners.click[0]();
+  check('Copy UPI ID falls back when clipboard access is unavailable',
+    fallbackCopy.copyCommands() === 1 &&
+    /copied/i.test(fallbackCopy.dom.upiCopyStatus.textContent));
+  const noQrLibrary = await boot({ qrcode: null });
+  noQrLibrary.order.setMenu(MENU);
+  noQrLibrary.order.add(itemKey(noQrLibrary.order, 'Flat White'), 1);
+  noQrLibrary.dom.orderName.value = 'A Customer';
+  noQrLibrary.dom.orderEmail.value = 'customer@example.com';
+  await noQrLibrary.order.submitOrder({ preventDefault() {} });
+  check('QR library failure keeps UPI app button and ID available',
+    noQrLibrary.dom.upiPayment.hidden === false &&
+    noQrLibrary.dom.upiQr.hidden === true &&
+    noQrLibrary.dom.upiQrFallback.hidden === false &&
+    noQrLibrary.dom.upiOpen.getAttribute('href').startsWith('upi://pay?') &&
+    noQrLibrary.dom.upiIdText.textContent === CONFIG.upiId);
+  const noUpiConfig = await boot({ config: { upiId: '' } });
+  noUpiConfig.order.setMenu(MENU);
+  noUpiConfig.order.add(itemKey(noUpiConfig.order, 'Flat White'), 1);
+  noUpiConfig.dom.orderName.value = 'A Customer';
+  noUpiConfig.dom.orderEmail.value = 'customer@example.com';
+  await noUpiConfig.order.submitOrder({ preventDefault() {} });
+  check('missing UPI ID leaves the QR block hidden after order submission',
+    noUpiConfig.dom.upiPayment.hidden === true &&
+    noUpiConfig.dom.upiQr.hidden === true);
+
+  check('WhatsApp button href is set after submission',
+    cart.dom.whatsappOrder.hidden === false &&
+    cart.dom.whatsappOrder.getAttribute('href').startsWith('https://wa.me/919876543210?text='));
+
   const trap = await boot();
   trap.order.setMenu(MENU);
   trap.order.add(itemKey(trap.order, 'Flat White'), 1);
@@ -374,12 +569,22 @@ function check(label, condition, detail) {
   await demo.order.submitOrder({ preventDefault() {} });
   check('demo flow does not contact Apps Script or claim an order was sent',
     demo.requests.length === 0 && demo.order.phase() === 'placed' && /Demo only/.test(demo.dom.payStatus.textContent));
+  check('demo payment step shows WhatsApp click-to-chat without sending automatically',
+    demo.dom.whatsappOrder.hidden === false &&
+    demo.dom.whatsappOrder.getAttribute('href').startsWith('https://wa.me/919876543210?text='));
 
   check('page has no EmailJS dependency or customer paid-claim button', !/@emailjs\/browser|id="claimBtn"/.test(HTML));
   check('page loads Apps Script transport and customer profile controls',
     /src="submit-order\.js"/.test(HTML) && /id="orderName"/.test(HTML) &&
     /id="orderPhone"/.test(HTML) && /id="whatsappOptIn"/.test(HTML) &&
     /id="profileDialog"/.test(HTML) && /id="profileEdit"/.test(HTML));
+  check('pinned QR library loads before order.js',
+    HTML.indexOf('https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js') !== -1 &&
+    HTML.indexOf('qrcode-generator/1.4.4/qrcode.min.js') < HTML.indexOf('src="order.js"'));
+  check('WhatsApp link opens safely and explains the manual backup confirmation',
+    /id="whatsappOrder"[^>]*target="_blank"[^>]*rel="noopener noreferrer"[^>]*hidden/.test(HTML) &&
+    /Optional: message the cafe on WhatsApp\./.test(HTML) &&
+    /backup confirmation the cafe will see/.test(HTML));
   check('backend validates IDs and totals', BACKEND.includes('ORDER_ID_PATTERN') && BACKEND.includes('Number(data.totalPaise) !== totalPaise'));
   check('backend throttles rapid repeat orders', BACKEND.includes('CacheService.getScriptCache') && BACKEND.includes('cache.put(cooldownKey, order.orderId, 15)'));
   const sentEmails = [];

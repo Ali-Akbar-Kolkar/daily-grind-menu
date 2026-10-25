@@ -178,7 +178,21 @@
           <p class="pay__label">Payment pending</p>
           <p id="payTotal" class="pay__amount"></p>
           <p class="pay__order">Order <span id="payId"></span></p>
+          <div id="upiPayment" class="upi-payment" hidden>
+            <a id="upiOpen" class="btn btn--wide upi-payment__open" href="">Open UPI app</a>
+            <div id="upiQr" class="upi-payment__qr" role="img" hidden></div>
+            <p id="upiQrFallback" class="upi-payment__fallback" hidden>QR preview is unavailable. Use Open UPI app or copy the UPI ID below.</p>
+            <p class="upi-payment__detail">Amount: <strong id="upiAmount"></strong></p>
+            <p class="upi-payment__detail">Order reference: <strong id="upiOrderId"></strong></p>
+            <p class="upi-payment__detail">UPI ID: <strong id="upiIdText"></strong></p>
+            <button id="upiCopy" class="btn btn--ghost" type="button">Copy UPI ID</button>
+            <p id="upiCopyStatus" class="note" role="status" aria-live="polite" hidden></p>
+            <p class="upi-payment__hint">Pay the exact amount and keep the order ID as the reference. The cafe emails you after confirming payment.</p>
+            <p class="upi-payment__caveat">This amount comes from the order submitted in this browser; the cafe will verify it against its bank app. Because this page cannot confirm Apps Script acceptance, wait for the order email. The cafe's email remains the confirmation of record.</p>
+          </div>
           <p class="pay__hint">Check your email (and WhatsApp if you opted in) for the cafe's UPI ID and payment instructions. Use this order ID as the payment reference.</p>
+          <a id="whatsappOrder" class="btn btn--wide pay__whatsapp" href="" target="_blank" rel="noopener noreferrer" hidden>Send order on WhatsApp</a>
+          <p class="pay__whatsapp-note">Optional: message the cafe on WhatsApp. Tap Send in WhatsApp to share your order. This message also serves as a backup confirmation the cafe will see; it does not confirm that the cafe has accepted your order.</p>
           <p class="pay__verify">Pay the cafe directly in your UPI app. The cafe checks its bank app and emails you after confirming payment, and sends a WhatsApp update if you opted in. Starting another order will not cancel this one; contact the cafe if you need to cancel it.</p>
 
           <p id="payStatus" class="note" role="status" hidden></p>
@@ -221,6 +235,7 @@
 <script src="image-urls.js" defer></script>
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5/papaparse.min.js" defer></script>
 <script src="submit-order.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js" defer></script>
 <script src="order.js" defer></script>
 <script src="script.js" defer></script>
 </body>
