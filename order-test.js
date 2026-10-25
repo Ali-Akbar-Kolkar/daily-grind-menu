@@ -874,8 +874,13 @@ function check(label, condition, detail) {
     /upi:\/\/pay\?.*am=5\.75.*cu=INR.*tn=ORD-TEST123.*tr=ORD-TEST123/.test(upiUrl));
   vm.runInContext("sendCustomerOrderEmail_({ orderId: 'ORD-TEST123', customerName: 'A Customer', customerEmail: 'customer@example.com', itemsText: 'Test item', totalPaise: 575 })", backendContext);
   const paymentPageUrl = vm.runInContext("paymentPageUrl_('ORD-TEST123')", backendContext);
+  const qrDownloadUrl = vm.runInContext(
+    "generateUpiQrUrl_({ totalPaise: 575, orderId: 'ORD-TEST123' })",
+    backendContext
+  );
   const escapedUpiUrl = upiUrl.replace(/&/g, '&amp;');
   const escapedPaymentPageUrl = paymentPageUrl.replace(/&/g, '&amp;');
+  const escapedQrDownloadUrl = qrDownloadUrl.replace(/&/g, '&amp;');
   check('customer email embeds a QR for the direct UPI URL',
     sentEmails[0].inlineImages.paymentQr === qrImage &&
     sentEmails[0].attachments[0] !== sentEmails[0].inlineImages.paymentQr &&
@@ -884,6 +889,9 @@ function check(label, condition, detail) {
     sentEmails[0].htmlBody.includes('download the attached') &&
     sentEmails[0].htmlBody.includes('upi-payment-ORD-TEST123.png') &&
     sentEmails[0].body.includes('Download the attached QR image: upi-payment-ORD-TEST123.png') &&
+    sentEmails[0].htmlBody.includes('href="' + escapedQrDownloadUrl + '"') &&
+    sentEmails[0].htmlBody.includes('>Download QR Code</a>') &&
+    sentEmails[0].body.includes('View/download the QR image: ' + qrDownloadUrl) &&
     sentEmails[0].body.includes('Scan the attached QR code') &&
     qrRequests[1].url.endsWith('data=' + encodeURIComponent(upiUrl)) &&
     qrRequests[1].options.muteHttpExceptions === true);
@@ -904,6 +912,7 @@ function check(label, condition, detail) {
     !sentEmails[1].inlineImages.paymentQr &&
     !sentEmails[1].attachments &&
     sentEmails[1].inlineImages.developerLogo === logoImage &&
+    sentEmails[1].htmlBody.includes('>Download QR Code</a>') &&
     sentEmails[1].body.includes('QR image is loaded directly in this email') &&
     sentEmails[1].htmlBody.includes('api.qrserver.com/v1/create-qr-code/') &&
     sentEmails[1].htmlBody.includes('alt="UPI payment QR code"') &&
