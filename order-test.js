@@ -54,6 +54,7 @@ function descendants(node, found = []) {
 }
 function buildDom() {
   const byId = {};
+  const canvasSizes = [];
   const document = { readyState: 'loading', activeElement: null, listeners: {} };
   const makeNode = (tag) => {
     const node = {
@@ -122,7 +123,10 @@ function buildDom() {
         drawImage() {},
         set fillStyle(value) { node._fillStyle = value; }
       });
-      node.toDataURL = (type) => type === 'image/jpeg' ? 'data:image/jpeg;base64,VEVTVA==' : 'data:,';
+      node.toDataURL = (type) => {
+        canvasSizes.push({ width: node.width, height: node.height });
+        return type === 'image/png' ? 'data:image/png;base64,VEVTVA==' : 'data:,';
+      };
     }
     return node;
   };
@@ -161,7 +165,7 @@ function buildDom() {
   ['profileName', 'profileEmail', 'profilePhone', 'profileStatus', 'profileSkip', 'profileForget']
     .forEach((id) => byId.profileForm.appendChild(byId[id]));
   ['stepCart', 'stepEmail', 'stepPay'].forEach((id) => byId.cart.appendChild(byId[id]));
-  return { document, byId };
+  return { document, byId, canvasSizes };
 }
 function fakeStorage(seed) {
   const data = new Map(Object.entries(seed || {}));
@@ -172,12 +176,13 @@ function fakeStorage(seed) {
   };
 }
 async function boot(options = {}) {
-  const { document, byId } = buildDom();
+  const { document, byId, canvasSizes } = buildDom();
   const requests = [];
   const logs = { info: [], warn: [], error: [] };
   const clipboardWrites = [];
   let copyCommands = 0;
   const store = options.storage || fakeStorage();
+  let qrSvgOptions = null;
   const fetchImpl = async (url, init) => {
     requests.push({ url, init });
     if (options.fetch) return options.fetch(url, init, requests.length);
@@ -192,7 +197,7 @@ async function boot(options = {}) {
       Object.defineProperty(this, 'src', {
         set(value) {
           this._src = value;
-          if (options.jpeg === false) {
+          if (options.png === false) {
             if (this.onerror) this.onerror(new Error('Image conversion unavailable'));
           } else if (this.onload) {
             this.onload();
@@ -220,7 +225,10 @@ async function boot(options = {}) {
         return {
           addData(data) { this.data = data; },
           make() {},
-          createSvgTag() { return '<svg><path /></svg>'; }
+          createSvgTag(cellSize, margin) {
+            qrSvgOptions = { cellSize, margin };
+            return '<svg><path /></svg>';
+          }
         };
       }
       : options.qrcode
@@ -236,7 +244,10 @@ async function boot(options = {}) {
   vm.runInContext(TRANSPORT, context, { filename: 'submit-order.js' });
   vm.runInContext(ORDER, context, { filename: 'order.js' });
   (document.listeners.DOMContentLoaded || []).forEach((listener) => listener());
-  return { order: sandbox.CafeOrder, dom: byId, document, requests, logs, store, clipboardWrites, copyCommands: () => copyCommands };
+  return {
+    order: sandbox.CafeOrder, dom: byId, document, requests, logs, store, clipboardWrites, canvasSizes,
+    qrSvgOptions: () => qrSvgOptions, copyCommands: () => copyCommands
+  };
 }
 function itemKey(order, itemName) {
   const item = MENU.find((entry) => entry.name === itemName);
@@ -397,8 +408,10 @@ function check(label, condition, detail) {
     cart.dom.upiQr.innerHTML.includes('<svg') &&
     cart.dom.upiQr.getAttribute('aria-label').includes(payload.orderId) &&
     cart.dom.upiQrDownload.hidden === false &&
-    cart.dom.upiQrDownload.getAttribute('href').startsWith('data:image/jpeg;base64,') &&
-    cart.dom.upiQrDownload.getAttribute('download') === 'upi-payment-' + payload.orderId + '.jpg' &&
+    cart.dom.upiQrDownload.getAttribute('href').startsWith('data:image/png;base64,') &&
+    cart.dom.upiQrDownload.getAttribute('download') === 'upi-payment-' + payload.orderId + '.png' &&
+    cart.qrSvgOptions().cellSize === 5 && cart.qrSvgOptions().margin === 4 &&
+    cart.canvasSizes.some((size) => size.width === 1024 && size.height === 1024) &&
     cart.dom.upiAmount.textContent === '₹12.75' &&
     cart.dom.upiOrderId.textContent === payload.orderId &&
     cart.dom.upiIdText.textContent === CONFIG.upiId);
@@ -635,18 +648,18 @@ function check(label, condition, detail) {
     noQrLibrary.dom.upiQrFallback.hidden === false &&
     noQrLibrary.dom.upiOpen.getAttribute('href').startsWith('upi://pay?') &&
     noQrLibrary.dom.upiIdText.textContent === CONFIG.upiId);
-  const noJpegSupport = await boot({ jpeg: false });
-  noJpegSupport.order.setMenu(MENU);
-  noJpegSupport.order.add(itemKey(noJpegSupport.order, 'Flat White'), 1);
-  noJpegSupport.dom.orderName.value = 'A Customer';
-  noJpegSupport.dom.orderEmail.value = 'customer@example.com';
-  await noJpegSupport.order.submitOrder({ preventDefault() {} });
-  check('JPEG conversion failure keeps the QR visible and explains the fallback',
-    noJpegSupport.dom.upiQrDisplay.hidden === false &&
-    noJpegSupport.dom.upiQrDownload.hidden === true &&
-    noJpegSupport.dom.upiQrDownloadStatus.hidden === false &&
-    /could not prepare a JPG/i.test(noJpegSupport.dom.upiQrDownloadStatus.textContent) &&
-    noJpegSupport.logs.error.some((args) => /Could not prepare a JPG payment QR download/.test(args[0])));
+  const noPngSupport = await boot({ png: false });
+  noPngSupport.order.setMenu(MENU);
+  noPngSupport.order.add(itemKey(noPngSupport.order, 'Flat White'), 1);
+  noPngSupport.dom.orderName.value = 'A Customer';
+  noPngSupport.dom.orderEmail.value = 'customer@example.com';
+  await noPngSupport.order.submitOrder({ preventDefault() {} });
+  check('PNG conversion failure keeps the QR visible and explains the fallback',
+    noPngSupport.dom.upiQrDisplay.hidden === false &&
+    noPngSupport.dom.upiQrDownload.hidden === true &&
+    noPngSupport.dom.upiQrDownloadStatus.hidden === false &&
+    /could not prepare a PNG/i.test(noPngSupport.dom.upiQrDownloadStatus.textContent) &&
+    noPngSupport.logs.error.some((args) => /Could not prepare a PNG payment QR download/.test(args[0])));
   const noUpiConfig = await boot({ config: { upiId: '' } });
   noUpiConfig.order.setMenu(MENU);
   noUpiConfig.order.add(itemKey(noUpiConfig.order, 'Flat White'), 1);
@@ -692,10 +705,10 @@ function check(label, condition, detail) {
     /src="submit-order\.js"/.test(HTML) && /id="orderName"/.test(HTML) &&
     /id="orderPhone"/.test(HTML) && /id="whatsappOptIn"/.test(HTML) &&
     /id="profileDialog"/.test(HTML) && /id="profileEdit"/.test(HTML));
-  check('payment QR is static and has a local JPG download',
+  check('payment QR is static and has a local PNG download',
     /<div id="upiQrDisplay"[^>]*hidden>/.test(HTML) &&
     !/<a id="upiQr(Link|Display)"/.test(HTML) &&
-    /id="upiQrDownload"[^>]*download[^>]*hidden>Download QR \(JPG\)<\/a>/.test(HTML) &&
+    /id="upiQrDownload"[^>]*download[^>]*hidden>Download QR \(PNG\)<\/a>/.test(HTML) &&
     /Scan the QR with another device/.test(HTML));
   check('profile saves a mobile number and checkout starts with +91',
     /id="profilePhone"[^>]*value="\+91 "/.test(HTML) &&
@@ -707,7 +720,7 @@ function check(label, condition, detail) {
     HTML.indexOf('qrcode-generator/1.4.4/qrcode.min.js') < HTML.indexOf('src="order.js?v='));
   check('profile and developer updates use cache-busted assets',
     /href="style\.css\?v=20261025-developer-credit"/.test(HTML) &&
-    /src="order\.js\?v=20261025-developer-credit"[^>]*defer/.test(HTML));
+    /src="order\.js\?v=20261030-qr-png"[^>]*defer/.test(HTML));
   check('WhatsApp link opens safely and explains the manual backup confirmation',
     /id="whatsappOrder"[^>]*target="_blank"[^>]*rel="noopener noreferrer"[^>]*hidden/.test(HTML) &&
     /Optional: send your order to the cafe on WhatsApp\./.test(HTML));

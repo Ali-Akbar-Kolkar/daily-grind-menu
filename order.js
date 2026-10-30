@@ -883,15 +883,15 @@
   function reportQrDownloadError(error) {
     if (dom.upiQrDownloadStatus) {
       dom.upiQrDownloadStatus.textContent =
-        'Could not prepare a JPG on this device. You can still scan the QR above or open your UPI app.';
+        'Could not prepare a PNG on this device. You can still scan the QR above or open your UPI app.';
       dom.upiQrDownloadStatus.hidden = false;
     }
     if (typeof console !== 'undefined' && typeof console.error === 'function') {
-      console.error('Could not prepare a JPG payment QR download:', error);
+      console.error('Could not prepare a PNG payment QR download:', error);
     }
   }
 
-  function prepareQrJpegDownload(svg, orderId, link) {
+  function prepareQrPngDownload(svg, orderId, link) {
     if (!dom.upiQrDownload || typeof window.Image !== 'function') {
       reportQrDownloadError(new Error('Image conversion is unavailable.'));
       return;
@@ -902,7 +902,7 @@
       image.onload = function () {
         if (lastUpiLink !== link) return;
         try {
-          var size = 512;
+          var size = 1024;
           var canvas = document.createElement('canvas');
           canvas.width = size;
           canvas.height = size;
@@ -911,12 +911,12 @@
           context.fillStyle = '#fff';
           context.fillRect(0, 0, size, size);
           context.drawImage(image, 0, 0, size, size);
-          var jpeg = canvas.toDataURL('image/jpeg', 0.95);
-          if (!/^data:image\/jpeg(?:;|,)/i.test(jpeg)) {
-            throw new Error('The browser could not encode the QR as JPEG.');
+          var png = canvas.toDataURL('image/png');
+          if (!/^data:image\/png(?:;|,)/i.test(png)) {
+            throw new Error('The browser could not encode the QR as PNG.');
           }
-          dom.upiQrDownload.setAttribute('href', jpeg);
-          dom.upiQrDownload.setAttribute('download', 'upi-payment-' + orderId + '.jpg');
+          dom.upiQrDownload.setAttribute('href', png);
+          dom.upiQrDownload.setAttribute('download', 'upi-payment-' + orderId + '.png');
           dom.upiQrDownload.hidden = false;
           if (dom.upiQrDownloadStatus) dom.upiQrDownloadStatus.hidden = true;
         } catch (error) {
@@ -982,10 +982,10 @@
       var qr = window.qrcode(0, 'M');
       qr.addData(link);
       qr.make();
-      var svg = qr.createSvgTag(5, 2);
+      var svg = qr.createSvgTag(5, 4);
       dom.upiQr.innerHTML = svg;
       if (dom.upiQrDisplay) dom.upiQrDisplay.hidden = false;
-      prepareQrJpegDownload(svg, order.id, link);
+      prepareQrPngDownload(svg, order.id, link);
       if (dom.upiQrFallback) dom.upiQrFallback.hidden = true;
     } catch (error) {
       if (dom.upiQrDisplay) dom.upiQrDisplay.hidden = true;
