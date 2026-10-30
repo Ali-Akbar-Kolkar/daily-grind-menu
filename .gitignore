@@ -9,3 +9,6 @@ archive/
 /PROJECT-STATUS.md
 /appScript
 /menu-images.csv
+.vscode/
+owner-editor/
+payment-backend/
